@@ -19,6 +19,7 @@
 
     var startTime = Date.now();
     var isLoaded = false;
+    var counterDone = false;
     var counterEl = loader.querySelector('[data-loady-counter]');
 
     document.body.setAttribute('data-loady-status', 'loading');
@@ -85,7 +86,7 @@
       }
 
       function tick() {
-        if (isLoaded) {
+        if (counterDone) {
           counterEl.textContent = '100%';
           return;
         }
@@ -110,6 +111,7 @@
 
     function snapCounterTo100() {
       if (!counterEl) return;
+      counterDone = true;
       counterEl.textContent = '100%';
     }
 
