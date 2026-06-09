@@ -16,7 +16,7 @@ FOUC-free page loader orchestrator for GSAP-powered websites. Drop it in, config
 ### 1. Add the CSS to `<head>`
 
 ```html
-<link rel="stylesheet" href="https://cdn.example.com/loady.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/szsoma/loady/loady.css">
 ```
 
 This snippet:
@@ -27,7 +27,7 @@ This snippet:
 ### 2. Add the script
 
 ```html
-<script src="https://cdn.example.com/loady.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/szsoma/loady/dist/loady.min.js"></script>
 ```
 
 ### 3. Mark up your loader
