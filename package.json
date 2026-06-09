@@ -11,7 +11,9 @@
   ],
   "scripts": {
     "build": "rollup -c",
-    "dev": "rollup -c -w"
+    "dev": "rollup -c -w",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "loader",
@@ -23,6 +25,8 @@
   "license": "MIT",
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
-    "rollup": "^4.9.0"
+    "jsdom": "^29.1.1",
+    "rollup": "^4.9.0",
+    "vitest": "^4.1.8"
   }
 }
