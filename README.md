@@ -55,18 +55,24 @@ This snippet:
 | Attribute | Default | Description |
 |---|---|---|
 | `data-loady="container"` | — | Identifies the loader wrapper (required) |
-| `data-loady-anim` | `slide-up` | Exit animation: `fade`, `slide-up`, `slide-down` |
-| `data-loady-duration` | `0.6` | Exit animation duration in seconds |
-| `data-loady-failsafe` | `8000` | Max wait in ms before force-dismissing the loader |
-| `data-loady-min` | `1500` | Minimum display time in ms (prevents flash on cached pages) |
+| `data-loady-anim` | `fade` | Exit animation: `fade`, `slide-up`, `slide-down` |
+| `data-loady-duration` | `0.5` | Exit animation duration in seconds |
+| `data-loady-failsafe` | `5000` | Max wait in ms before force-dismissing the loader |
+| `data-loady-min` | `0` | Minimum display time in ms (prevents flash on cached pages) |
 | `data-loady-counter` | — | Animate a child element from 0% to 85% (snaps to 100% on load) |
 | `data-loady-ignore` | — | CSS selector for links that should skip the loader on next navigation |
+| `data-loady-once` | `false` | Only show the loader once per browser tab session |
+| `data-loady-debug` | `false` | Log performance metrics to the console on loader exit |
 
 ## Events
 
 | Event | Description |
 |---|---|
 | `pageLoady:finished` | Dispatched on `window` when the loader has fully exited. This is your signal to start GSAP animations. |
+
+## URL Bypass
+
+Append `?noloader=true` to any URL to skip the loader entirely. Useful during QA and staging reviews.
 
 ## Features
 
@@ -78,6 +84,7 @@ This snippet:
 - **Progress counter** — lightweight 0%→85% eased counter, snaps to 100% when loading completes
 - **Ignore links** — excludes anchor links (`#section`), mailto, or any selector from triggering the loader
 - **Accessible** — sets `aria-busy="true"` on body, restores on finish
+- **MutationObserver** — auto-hides dynamically injected `[data-gsap-hide]` elements (CMS, infinite scroll)
 - **Zero dependencies** — pure vanilla JS, works with any framework or none
 
 ## Development
@@ -86,6 +93,7 @@ This snippet:
 npm install
 npm run build       # Build dist/ files
 npm run dev         # Watch mode
+npm test            # Run tests
 ```
 
 Outputs four bundle formats to `dist/`:
