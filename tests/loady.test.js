@@ -5,15 +5,19 @@ function setupDOM(loaderHTML) {
 }
 
 var _dclFns = [];
+var _clickFns = [];
 
 function loadScript() {
   vi.resetModules();
   _dclFns.forEach(function (fn) { document.removeEventListener('DOMContentLoaded', fn); });
   _dclFns = [];
+  _clickFns.forEach(function (fn) { document.removeEventListener('click', fn); });
+  _clickFns = [];
 
   var origAdd = document.addEventListener;
   document.addEventListener = function (type, fn, opts) {
     if (type === 'DOMContentLoaded') _dclFns.push(fn);
+    if (type === 'click') _clickFns.push(fn);
     return origAdd.call(document, type, fn, opts);
   };
 

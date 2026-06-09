@@ -2,6 +2,7 @@
   'use strict';
 
   var IGNORE_KEY = 'loady:ignore';
+  var SEEN_KEY = 'loady:seen';
 
   document.addEventListener('DOMContentLoaded', function () {
     var loader = document.querySelector('[data-loady="container"]');
@@ -14,12 +15,12 @@
     }
 
     var runOnce = loader.getAttribute('data-loady-once') === 'true';
-    if (runOnce && sessionStorage.getItem('loady:seen') === 'true') {
+    if (runOnce && sessionStorage.getItem(SEEN_KEY) === 'true') {
       finishImmediately();
       return;
     }
     if (runOnce) {
-      sessionStorage.setItem('loady:seen', 'true');
+      sessionStorage.setItem(SEEN_KEY, 'true');
     }
 
     if (sessionStorage.getItem(IGNORE_KEY) === '1') {
@@ -28,10 +29,10 @@
       return;
     }
 
-    var animType = loader.getAttribute('data-loady-anim') || 'fade';
-    var duration = parseFloat(loader.getAttribute('data-loady-duration')) || 0.5;
-    var failsafeTime = parseInt(loader.getAttribute('data-loady-failsafe'), 10) || 5000;
-    var minTime = parseInt(loader.getAttribute('data-loady-min'), 10) || 0;
+    var animType = loader.getAttribute('data-loady-anim') || 'slide-up';
+    var duration = parseFloat(loader.getAttribute('data-loady-duration')) || 0.6;
+    var failsafeTime = parseInt(loader.getAttribute('data-loady-failsafe'), 10) || 8000;
+    var minTime = parseInt(loader.getAttribute('data-loady-min'), 10) || 1500;
 
     var startTime = Date.now();
     var isLoaded = false;

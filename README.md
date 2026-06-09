@@ -55,10 +55,10 @@ This snippet:
 | Attribute | Default | Description |
 |---|---|---|
 | `data-loady="container"` | — | Identifies the loader wrapper (required) |
-| `data-loady-anim` | `fade` | Exit animation: `fade`, `slide-up`, `slide-down` |
-| `data-loady-duration` | `0.5` | Exit animation duration in seconds |
-| `data-loady-failsafe` | `5000` | Max wait in ms before force-dismissing the loader |
-| `data-loady-min` | `0` | Minimum display time in ms (prevents flash on cached pages) |
+| `data-loady-anim` | `slide-up` | Exit animation: `fade`, `slide-up`, `slide-down` |
+| `data-loady-duration` | `0.6` | Exit animation duration in seconds |
+| `data-loady-failsafe` | `8000` | Max wait in ms before force-dismissing the loader |
+| `data-loady-min` | `1500` | Minimum display time in ms (prevents flash on cached pages) |
 | `data-loady-counter` | — | Animate a child element from 0% to 85% (snaps to 100% on load) |
 | `data-loady-ignore` | — | CSS selector for links that should skip the loader on next navigation |
 
