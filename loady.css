@@ -1,0 +1,23 @@
+/* Loady — CDN Page Loader
+ * Paste this snippet into the <head> of your page.
+ * https://github.com/anomalyco/loady
+ */
+
+/* 1. Instantly hide elements meant for GSAP/JS animations */
+[data-gsap-hide] {
+  visibility: hidden;
+  opacity: 0;
+}
+
+/* 2. Lock body scroll while loading */
+body[data-loady-status="loading"] {
+  overflow: hidden;
+}
+
+/* 3. Ensure the loader is always on top and visible initially */
+[data-loady="container"] {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+}

@@ -1,0 +1,28 @@
+{
+  "name": "loady",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "FOUC-free CDN page loader orchestrator for GSAP-powered websites",
+  "main": "dist/loady.js",
+  "module": "dist/loady.esm.js",
+  "files": [
+    "dist/",
+    "loady.css"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w"
+  },
+  "keywords": [
+    "loader",
+    "gsap",
+    "fouc",
+    "page-transitions",
+    "cdn"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "rollup": "^4.9.0"
+  }
+}
