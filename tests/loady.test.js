@@ -204,3 +204,63 @@ describe('Debug mode (data-loady-debug)', () => {
     expect(tableSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('MutationObserver for injected elements', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('hides dynamically injected elements with data-gsap-hide', async () => {
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var injected = document.createElement('div');
+    injected.setAttribute('data-gsap-hide', '');
+    document.body.appendChild(injected);
+
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(injected.style.visibility).toBe('hidden');
+    expect(injected.style.opacity).toBe('0');
+  });
+
+  it('hides children of injected nodes that have data-gsap-hide', async () => {
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var wrapper = document.createElement('div');
+    var child = document.createElement('span');
+    child.setAttribute('data-gsap-hide', '');
+    wrapper.appendChild(child);
+    document.body.appendChild(wrapper);
+
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(child.style.visibility).toBe('hidden');
+    expect(child.style.opacity).toBe('0');
+  });
+
+  it('does not modify elements without data-gsap-hide', async () => {
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var normal = document.createElement('div');
+    normal.textContent = 'Hello';
+    document.body.appendChild(normal);
+
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(normal.style.visibility).toBe('');
+    expect(normal.style.opacity).toBe('');
+  });
+});
