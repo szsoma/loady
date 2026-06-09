@@ -7,6 +7,15 @@
     var loader = document.querySelector('[data-loady="container"]');
     if (!loader) return;
 
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('noloader') === 'true') {
+      loader.style.display = 'none';
+      document.body.removeAttribute('data-loady-status');
+      document.body.removeAttribute('aria-busy');
+      window.dispatchEvent(new CustomEvent('pageLoady:finished'));
+      return;
+    }
+
     if (sessionStorage.getItem(IGNORE_KEY) === '1') {
       sessionStorage.removeItem(IGNORE_KEY);
       finishImmediately();
