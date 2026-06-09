@@ -13,6 +13,15 @@
       return;
     }
 
+    var runOnce = loader.getAttribute('data-loady-once') === 'true';
+    if (runOnce && sessionStorage.getItem('loady:seen') === 'true') {
+      finishImmediately();
+      return;
+    }
+    if (runOnce) {
+      sessionStorage.setItem('loady:seen', 'true');
+    }
+
     if (sessionStorage.getItem(IGNORE_KEY) === '1') {
       sessionStorage.removeItem(IGNORE_KEY);
       finishImmediately();
