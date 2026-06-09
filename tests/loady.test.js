@@ -154,3 +154,53 @@ describe('Run-once (data-loady-once)', () => {
     expect(document.body.getAttribute('data-loady-status')).toBe('loading');
   });
 });
+
+describe('Debug mode (data-loady-debug)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('logs debug info to console when data-loady-debug="true"', async () => {
+    setupDOM('<div data-loady="container" data-loady-debug="true" data-loady-anim="slide-up"><span data-loady-counter>0%</span></div>');
+
+    var groupSpy = vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+    var tableSpy = vi.spyOn(console, 'table').mockImplementation(() => {});
+    var groupEndSpy = vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 100));
+
+    expect(groupSpy).toHaveBeenCalled();
+    expect(tableSpy).toHaveBeenCalled();
+    var tableArg = tableSpy.mock.calls[0][0];
+    expect(tableArg['Trigger Source']).toBeDefined();
+    expect(tableArg['Animation Type']).toBe('slide-up');
+    expect(groupEndSpy).toHaveBeenCalled();
+  });
+
+  it('does not log when data-loady-debug is absent', async () => {
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+
+    var groupSpy = vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+    var tableSpy = vi.spyOn(console, 'table').mockImplementation(() => {});
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 100));
+
+    expect(groupSpy).not.toHaveBeenCalled();
+    expect(tableSpy).not.toHaveBeenCalled();
+  });
+});
