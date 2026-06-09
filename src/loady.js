@@ -40,6 +40,7 @@
     var isLoaded = false;
     var counterDone = false;
     var counterEl = loader.querySelector('[data-loady-counter]');
+    var barEl = loader.querySelector('[data-loady-bar]');
 
     document.body.setAttribute('data-loady-status', 'loading');
     document.body.setAttribute('aria-busy', 'true');
@@ -152,6 +153,7 @@
       function tick() {
         if (counterDone) {
           counterEl.textContent = '100%';
+          if (barEl) barEl.style.width = '100%';
           return;
         }
 
@@ -161,6 +163,7 @@
         var val = Math.round(eased * target);
 
         counterEl.textContent = val + '%';
+        if (barEl) barEl.style.width = val + '%';
 
         if (progress < 1) {
           requestAnimationFrame(function () {
@@ -177,6 +180,7 @@
       if (!counterEl) return;
       counterDone = true;
       counterEl.textContent = '100%';
+      if (barEl) barEl.style.width = '100%';
     }
 
     window.addEventListener('load', function () {
