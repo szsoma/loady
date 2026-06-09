@@ -426,3 +426,60 @@ describe('Webflow IX2 auto-pause', () => {
     expect(document.body.getAttribute('data-loady-status')).toBe('loading');
   });
 });
+
+describe('Debug mode includes GSAP/IX2 status', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete window.gsap;
+    delete window.Webflow;
+  });
+
+  it('shows GSAP and IX2 status in debug table', async () => {
+    window.gsap = { globalTimeline: { pause: vi.fn(), resume: vi.fn() } };
+    window.Webflow = { require: vi.fn(() => ({ destroy: vi.fn(), init: vi.fn() })) };
+
+    setupDOM('<div data-loady="container" data-loady-debug="true"><span data-loady-counter>0%</span></div>');
+
+    var tableSpy = vi.spyOn(console, 'table').mockImplementation(() => {});
+    vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+    vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 600));
+
+    var tableArg = tableSpy.mock.calls[0][0];
+    expect(tableArg['GSAP Paused']).toBe(true);
+    expect(tableArg['IX2 Paused']).toBe(true);
+  });
+
+  it('shows false when GSAP/IX2 are opted out', async () => {
+    window.gsap = { globalTimeline: { pause: vi.fn(), resume: vi.fn() } };
+    window.Webflow = { require: vi.fn(() => ({ destroy: vi.fn(), init: vi.fn() })) };
+
+    setupDOM('<div data-loady="container" data-loady-debug="true" data-loady-gsap="false" data-loady-ix2="false"><span data-loady-counter>0%</span></div>');
+
+    var tableSpy = vi.spyOn(console, 'table').mockImplementation(() => {});
+    vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+    vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 600));
+
+    var tableArg = tableSpy.mock.calls[0][0];
+    expect(tableArg['GSAP Paused']).toBe(false);
+    expect(tableArg['IX2 Paused']).toBe(false);
+  });
+});

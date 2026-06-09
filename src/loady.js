@@ -131,6 +131,8 @@
         'Failsafe (ms)': failsafeTime,
         'Min Display (ms)': minTime,
         'Run Once': runOnce,
+        'GSAP Paused': !skipGSAP && !!gsapTL,
+        'IX2 Paused': !skipIX2 && !!ix2Engine,
       });
       console.groupEnd();
     }
