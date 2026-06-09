@@ -264,3 +264,82 @@ describe('MutationObserver for injected elements', () => {
     expect(normal.style.opacity).toBe('');
   });
 });
+
+describe('GSAP auto-pause', () => {
+  var mockGSAP;
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '' },
+    });
+
+    mockGSAP = {
+      globalTimeline: {
+        pause: vi.fn(),
+        resume: vi.fn(),
+      },
+    };
+    window.gsap = mockGSAP;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete window.gsap;
+    Object.defineProperty(window, 'location', { writable: true });
+  });
+
+  it('pauses gsap.globalTimeline on loader init', async () => {
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+
+    expect(mockGSAP.globalTimeline.pause).toHaveBeenCalled();
+  });
+
+  it('resumes gsap.globalTimeline when loader finishes', async () => {
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 600));
+
+    expect(mockGSAP.globalTimeline.resume).toHaveBeenCalled();
+  });
+
+  it('resumes gsap.globalTimeline on finishImmediately (noloader bypass)', async () => {
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '?noloader=true' },
+    });
+
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+
+    expect(mockGSAP.globalTimeline.resume).toHaveBeenCalled();
+  });
+
+  it('does not pause GSAP when data-loady-gsap="false"', async () => {
+    setupDOM('<div data-loady="container" data-loady-gsap="false"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+
+    expect(mockGSAP.globalTimeline.pause).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when GSAP is not present', async () => {
+    delete window.gsap;
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+
+    expect(() => fireDOMContentLoaded()).not.toThrow();
+    expect(document.body.getAttribute('data-loady-status')).toBe('loading');
+  });
+});
