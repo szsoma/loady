@@ -16,8 +16,10 @@ FOUC-free page loader orchestrator for GSAP-powered websites. Drop it in, config
 ### 1. Add the CSS to `<head>`
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/szsoma/loady/loady.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/szsoma/loady@main/loady.css">
 ```
+
+If you've tagged a release, replace `@main` with the version (e.g. `@1.0.0`).
 
 This snippet:
 - Hides elements with `[data-gsap-hide]` until animations are ready
@@ -27,8 +29,12 @@ This snippet:
 ### 2. Add the script
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/szsoma/loady/dist/loady.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/szsoma/loady@main/dist/loady.min.js"></script>
 ```
+
+If you've tagged a release, replace `@main` with the version (e.g. `@1.0.0`).
+
+jsDelivr caches files aggressively. To purge a cached file after a push, open this URL in your browser: `https://purge.jsdelivr.net/gh/szsoma/loady@main/dist/loady.min.js`.
 
 ### 3. Mark up your loader
 
@@ -60,6 +66,7 @@ This snippet:
 | `data-loady-failsafe` | `5000` | Max wait in ms before force-dismissing the loader |
 | `data-loady-min` | `0` | Minimum display time in ms (prevents flash on cached pages) |
 | `data-loady-counter` | — | Animate a child element from 0% to 85% (snaps to 100% on load) |
+| `data-loady-bar` | — | Target a child element to sync its width with the progress |
 | `data-loady-ignore` | — | CSS selector for links that should skip the loader on next navigation |
 | `data-loady-once` | `false` | Only show the loader once per browser tab session |
 | `data-loady-debug` | `false` | Log performance metrics to the console on loader exit |
