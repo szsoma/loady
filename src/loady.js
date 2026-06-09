@@ -9,10 +9,7 @@
 
     var urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('noloader') === 'true') {
-      loader.style.display = 'none';
-      document.body.removeAttribute('data-loady-status');
-      document.body.removeAttribute('aria-busy');
-      window.dispatchEvent(new CustomEvent('pageLoady:finished'));
+      finishImmediately();
       return;
     }
 

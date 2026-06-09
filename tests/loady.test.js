@@ -73,6 +73,7 @@ describe('URL bypass (?noloader=true)', () => {
     fireDOMContentLoaded();
 
     expect(document.body.getAttribute('data-loady-status')).toBeNull();
+    expect(document.querySelector('[data-loady="container"]').style.display).toBe('none');
     expect(eventFired).toBe(true);
   });
 
