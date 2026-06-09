@@ -20,12 +20,31 @@
     }
   }
 
+  var ix2Engine = null;
+
+  function pauseIX2() {
+    if (window.Webflow && typeof window.Webflow.require === 'function') {
+      ix2Engine = window.Webflow.require('ix2');
+      if (ix2Engine) ix2Engine.destroy();
+    }
+  }
+
+  function resumeIX2() {
+    if (ix2Engine) {
+      ix2Engine.init();
+      ix2Engine = null;
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var loader = document.querySelector('[data-loady="container"]');
     if (!loader) return;
 
     var skipGSAP = loader.getAttribute('data-loady-gsap') === 'false';
     if (!skipGSAP) pauseGSAP();
+
+    var skipIX2 = loader.getAttribute('data-loady-ix2') === 'false';
+    if (!skipIX2) pauseIX2();
 
     var urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('noloader') === 'true') {
@@ -157,11 +176,13 @@
     function finish() {
       observer.disconnect();
       resumeGSAP();
+      resumeIX2();
       cleanupLoader();
     }
 
     function finishImmediately() {
       resumeGSAP();
+      resumeIX2();
       cleanupLoader();
     }
 

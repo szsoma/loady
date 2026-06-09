@@ -343,3 +343,86 @@ describe('GSAP auto-pause', () => {
     expect(document.body.getAttribute('data-loady-status')).toBe('loading');
   });
 });
+
+describe('Webflow IX2 auto-pause', () => {
+  var mockIx2;
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '' },
+    });
+
+    mockIx2 = {
+      destroy: vi.fn(),
+      init: vi.fn(),
+    };
+    window.Webflow = {
+      require: vi.fn(function (mod) {
+        if (mod === 'ix2') return mockIx2;
+        return null;
+      }),
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete window.Webflow;
+    Object.defineProperty(window, 'location', { writable: true });
+  });
+
+  it('destroys IX2 on loader init', async () => {
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+
+    expect(window.Webflow.require).toHaveBeenCalledWith('ix2');
+    expect(mockIx2.destroy).toHaveBeenCalled();
+  });
+
+  it('re-initializes IX2 when loader finishes', async () => {
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 600));
+
+    expect(mockIx2.init).toHaveBeenCalled();
+  });
+
+  it('re-initializes IX2 on finishImmediately (noloader bypass)', async () => {
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '?noloader=true' },
+    });
+
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+
+    expect(mockIx2.init).toHaveBeenCalled();
+  });
+
+  it('does not destroy IX2 when data-loady-ix2="false"', async () => {
+    setupDOM('<div data-loady="container" data-loady-ix2="false"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+    fireDOMContentLoaded();
+
+    expect(mockIx2.destroy).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when Webflow is not present', async () => {
+    delete window.Webflow;
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+    await loadScript();
+
+    expect(() => fireDOMContentLoaded()).not.toThrow();
+    expect(document.body.getAttribute('data-loady-status')).toBe('loading');
+  });
+});
