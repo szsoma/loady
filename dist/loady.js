@@ -6,13 +6,52 @@
     var IGNORE_KEY = 'loady:ignore';
     var SEEN_KEY = 'loady:seen';
 
+    var gsapTL = null;
+
+    function pauseGSAP() {
+      if (window.gsap && window.gsap.globalTimeline) {
+        gsapTL = window.gsap.globalTimeline;
+        gsapTL.pause();
+      }
+    }
+
+    function resumeGSAP() {
+      if (gsapTL) {
+        gsapTL.resume();
+        gsapTL = null;
+      }
+    }
+
+    var ix2Engine = null;
+
+    function pauseIX2() {
+      if (window.Webflow && typeof window.Webflow.require === 'function') {
+        ix2Engine = window.Webflow.require('ix2');
+        if (ix2Engine) ix2Engine.destroy();
+      }
+    }
+
+    function resumeIX2() {
+      if (ix2Engine) {
+        ix2Engine.init();
+        ix2Engine = null;
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
       var loader = document.querySelector('[data-loady="container"]');
       if (!loader) return;
 
+      var skipGSAP = loader.getAttribute('data-loady-gsap') === 'false';
+      if (!skipGSAP) pauseGSAP();
+
+      var skipIX2 = loader.getAttribute('data-loady-ix2') === 'false';
+      if (!skipIX2) pauseIX2();
+
       var urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('noloader') === 'true') {
         sessionStorage.removeItem(SEEN_KEY);
+        sessionStorage.removeItem(IGNORE_KEY);
         finishImmediately();
         return;
       }
@@ -33,9 +72,12 @@
       }
 
       var animType = loader.getAttribute('data-loady-anim') || 'fade';
-      var duration = parseFloat(loader.getAttribute('data-loady-duration')) || 0.5;
-      var failsafeTime = parseInt(loader.getAttribute('data-loady-failsafe'), 10) || 5000;
-      var minTime = parseInt(loader.getAttribute('data-loady-min'), 10) || 0;
+      var durationVal = parseFloat(loader.getAttribute('data-loady-duration'));
+      var duration = isNaN(durationVal) ? 0.5 : durationVal;
+      var failsafeVal = parseInt(loader.getAttribute('data-loady-failsafe'), 10);
+      var failsafeTime = isNaN(failsafeVal) ? 5000 : failsafeVal;
+      var minVal = parseInt(loader.getAttribute('data-loady-min'), 10);
+      var minTime = isNaN(minVal) ? 0 : minVal;
       var isDebug = loader.getAttribute('data-loady-debug') === 'true';
       var easing = loader.getAttribute('data-loady-easing') || 'ease-in-out';
 
@@ -91,6 +133,8 @@
           'Failsafe (ms)': failsafeTime,
           'Min Display (ms)': minTime,
           'Run Once': runOnce,
+          'GSAP Paused': !skipGSAP && !!gsapTL,
+          'IX2 Paused': !skipIX2 && !!ix2Engine,
         });
         console.groupEnd();
       }
@@ -112,15 +156,13 @@
         loader.style.transition = 'all ' + duration + 's ' + easing;
 
         switch (animType) {
-          case 'fade':
-            loader.style.opacity = '0';
-            break;
           case 'slide-up':
             loader.style.transform = 'translateY(-100%)';
             break;
           case 'slide-down':
             loader.style.transform = 'translateY(100%)';
             break;
+          case 'fade':
           default:
             loader.style.opacity = '0';
         }
@@ -128,19 +170,29 @@
         setTimeout(finish, duration * 1000);
       }
 
-      function finish() {
-        observer.disconnect();
+      function cleanupLoader() {
         loader.style.display = 'none';
         document.body.removeAttribute('data-loady-status');
         document.body.removeAttribute('aria-busy');
         window.dispatchEvent(new CustomEvent('pageLoady:finished'));
       }
 
+      function finish() {
+        observer.disconnect();
+        resumeGSAP();
+        resumeIX2();
+        cleanupLoader();
+      }
+
       function finishImmediately() {
-        loader.style.display = 'none';
-        document.body.removeAttribute('data-loady-status');
-        document.body.removeAttribute('aria-busy');
-        window.dispatchEvent(new CustomEvent('pageLoady:finished'));
+        resumeGSAP();
+        resumeIX2();
+        cleanupLoader();
+      }
+
+      function renderComplete() {
+        counterEl.textContent = '100%';
+        if (barEl) barEl.style.width = '100%';
       }
 
       function startCounter() {
@@ -157,8 +209,7 @@
 
         function tick() {
           if (counterDone) {
-            counterEl.textContent = '100%';
-            if (barEl) barEl.style.width = '100%';
+            renderComplete();
             return;
           }
 
@@ -184,8 +235,17 @@
       function snapCounterTo100() {
         if (!counterEl) return;
         counterDone = true;
-        counterEl.textContent = '100%';
-        if (barEl) barEl.style.width = '100%';
+        renderComplete();
+      }
+
+      var ignoreList = loader.getAttribute('data-loady-ignore');
+      if (ignoreList) {
+        document.addEventListener('click', function (e) {
+          var target = e.target.closest(ignoreList);
+          if (target) {
+            sessionStorage.setItem(IGNORE_KEY, '1');
+          }
+        });
       }
 
       window.addEventListener('load', function () {
@@ -194,19 +254,6 @@
       setTimeout(function () {
         removeLoader('Failsafe');
       }, failsafeTime);
-    });
-
-    document.addEventListener('click', function (e) {
-      var container = document.querySelector('[data-loady="container"]');
-      if (!container) return;
-
-      var ignoreList = container.getAttribute('data-loady-ignore');
-      if (!ignoreList) return;
-
-      var target = e.target.closest(ignoreList);
-      if (target) {
-        sessionStorage.setItem(IGNORE_KEY, '1');
-      }
     });
   })();
 
