@@ -46,6 +46,33 @@
 
     startCounter();
 
+    var observer = new MutationObserver(function (mutationsList) {
+      for (var i = 0; i < mutationsList.length; i++) {
+        var mutation = mutationsList[i];
+        if (mutation.addedNodes.length > 0) {
+          for (var j = 0; j < mutation.addedNodes.length; j++) {
+            var node = mutation.addedNodes[j];
+            if (node.nodeType === 1) {
+              if (node.hasAttribute('data-gsap-hide')) {
+                node.style.visibility = 'hidden';
+                node.style.opacity = '0';
+              }
+              var hiddenChildren = node.querySelectorAll('[data-gsap-hide]');
+              for (var k = 0; k < hiddenChildren.length; k++) {
+                hiddenChildren[k].style.visibility = 'hidden';
+                hiddenChildren[k].style.opacity = '0';
+              }
+            }
+          }
+        }
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
     function logDebug(triggerSource) {
       if (!isDebug) return;
       var timeTaken = ((performance.now() - perfStart) / 1000).toFixed(2);
@@ -96,6 +123,7 @@
     }
 
     function finish() {
+      observer.disconnect();
       loader.style.display = 'none';
       document.body.removeAttribute('data-loady-status');
       document.body.removeAttribute('aria-busy');
@@ -171,32 +199,5 @@
     if (target) {
       sessionStorage.setItem(IGNORE_KEY, '1');
     }
-  });
-
-  var observer = new MutationObserver(function (mutationsList) {
-    for (var i = 0; i < mutationsList.length; i++) {
-      var mutation = mutationsList[i];
-      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        for (var j = 0; j < mutation.addedNodes.length; j++) {
-          var node = mutation.addedNodes[j];
-          if (node.nodeType === 1) {
-            if (node.hasAttribute('data-gsap-hide')) {
-              node.style.visibility = 'hidden';
-              node.style.opacity = '0';
-            }
-            var hiddenChildren = node.querySelectorAll('[data-gsap-hide]');
-            for (var k = 0; k < hiddenChildren.length; k++) {
-              hiddenChildren[k].style.visibility = 'hidden';
-              hiddenChildren[k].style.opacity = '0';
-            }
-          }
-        }
-      }
-    }
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
   });
 })();
