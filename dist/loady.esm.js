@@ -9,6 +9,7 @@
 
     var urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('noloader') === 'true') {
+      sessionStorage.removeItem(SEEN_KEY);
       finishImmediately();
       return;
     }
