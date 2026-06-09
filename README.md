@@ -62,6 +62,7 @@ jsDelivr caches files aggressively. To purge a cached file after a push, open th
 |---|---|---|
 | `data-loady="container"` | — | Identifies the loader wrapper (required) |
 | `data-loady-anim` | `fade` | Exit animation: `fade`, `slide-up`, `slide-down` |
+| `data-loady-easing` | `ease-in-out` | CSS easing function for the exit animation (e.g. `linear`, `ease`, `cubic-bezier(...)`) |
 | `data-loady-duration` | `0.5` | Exit animation duration in seconds |
 | `data-loady-failsafe` | `5000` | Max wait in ms before force-dismissing the loader |
 | `data-loady-min` | `0` | Minimum display time in ms (prevents flash on cached pages) |

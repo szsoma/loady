@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Loady — CDN Page Loader Demo</title>
 
-    <link
-      rel="stylesheet"
-      href="../loady.css"
-    />
+    <link rel="stylesheet" href="../loady.css" />
 
     <style>
       *,
@@ -155,7 +152,7 @@
     <div
       data-loady="container"
       data-loady-anim="slide-up"
-      data-loady-duration="0.6"
+      data-loady-duration="2"
       data-loady-failsafe="8000"
       data-loady-min="1500"
       data-loady-debug="true"
@@ -164,7 +161,9 @@
       <div class="loader-inner">
         <div class="loader-logo">Loady</div>
         <div class="loader-counter" data-loady-counter>0%</div>
-        <div class="loader-bar"><div class="loader-bar-fill" data-loady-bar></div></div>
+        <div class="loader-bar">
+          <div class="loader-bar-fill" data-loady-bar></div>
+        </div>
       </div>
     </div>
 

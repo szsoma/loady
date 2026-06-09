@@ -35,6 +35,7 @@
     var failsafeTime = parseInt(loader.getAttribute('data-loady-failsafe'), 10) || 5000;
     var minTime = parseInt(loader.getAttribute('data-loady-min'), 10) || 0;
     var isDebug = loader.getAttribute('data-loady-debug') === 'true';
+    var easing = loader.getAttribute('data-loady-easing') || 'ease-in-out';
 
     var startTime = Date.now();
     var perfStart = performance.now();
@@ -83,6 +84,7 @@
         'Trigger Source': triggerSource,
         'Time Taken (s)': timeTaken,
         'Animation Type': animType,
+        'Easing': easing,
         'Duration (s)': duration,
         'Failsafe (ms)': failsafeTime,
         'Min Display (ms)': minTime,
@@ -105,7 +107,7 @@
     function animateOut() {
       snapCounterTo100();
 
-      loader.style.transition = 'all ' + duration + 's ease-in-out';
+      loader.style.transition = 'all ' + duration + 's ' + easing;
 
       switch (animType) {
         case 'fade':
