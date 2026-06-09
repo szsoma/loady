@@ -26,15 +26,26 @@ This snippet:
 - Locks `overflow` on `body` while the loader is active
 - Positions the loader fixed full-screen with maximum z-index
 
-### 2. Add the script
+### 2. Add the script before `</body>`
 
 ```html
 <script src="https://cdn.jsdelivr.net/gh/szsoma/loady@main/dist/loady.min.js"></script>
+</body>
 ```
 
 If you've tagged a release, replace `@main` with the version (e.g. `@1.0.0`).
 
 jsDelivr caches files aggressively. To purge a cached file after a push, open this URL in your browser: `https://purge.jsdelivr.net/gh/szsoma/loady@main/dist/loady.min.js`.
+
+#### ESM usage
+
+For module-based setups, import the ESM build instead:
+
+```html
+<script type="module">
+  import 'https://cdn.jsdelivr.net/gh/szsoma/loady@main/dist/loady.esm.min.js';
+</script>
+```
 
 ### 3. Mark up your loader
 
@@ -61,22 +72,40 @@ jsDelivr caches files aggressively. To purge a cached file after a push, open th
 | Attribute | Default | Description |
 |---|---|---|
 | `data-loady="container"` | — | Identifies the loader wrapper (required) |
+| `data-gsap-hide` | — | Add to any element to hide it until `pageLoady:finished` fires (set via CSS, auto-hidden for dynamically injected nodes too) |
 | `data-loady-anim` | `fade` | Exit animation: `fade`, `slide-up`, `slide-down` |
-| `data-loady-easing` | `ease-in-out` | CSS easing function for the exit animation (e.g. `linear`, `ease`, `cubic-bezier(...)`) |
+| `data-loady-easing` | `ease-in-out` | CSS easing function for the exit animation. See hint: https://easings.net (e.g. `linear`, `ease`, `cubic-bezier(...)`) |
 | `data-loady-duration` | `0.5` | Exit animation duration in seconds |
 | `data-loady-failsafe` | `5000` | Max wait in ms before force-dismissing the loader |
 | `data-loady-min` | `0` | Minimum display time in ms (prevents flash on cached pages) |
 | `data-loady-counter` | — | Animate a child element from 0% to 85% (snaps to 100% on load) |
 | `data-loady-bar` | — | Target a child element to sync its width with the progress |
 | `data-loady-ignore` | — | CSS selector for links that should skip the loader on next navigation |
-| `data-loady-once` | `false` | Only show the loader once per browser tab session |
+| `data-loady-once` | `false` | Only show the loader once per tab session (uses `sessionStorage`; resets when the tab closes) |
 | `data-loady-debug` | `false` | Log performance metrics to the console on loader exit |
+| `data-loady-gsap` | `true` | Set to `false` to skip auto-pausing GSAP's `globalTimeline` during load |
+| `data-loady-ix2` | `true` | Set to `false` to skip auto-pausing Webflow IX2 interactions during load |
 
 ## Events
 
 | Event | Description |
 |---|---|
 | `pageLoady:finished` | Dispatched on `window` when the loader has fully exited. This is your signal to start GSAP animations. |
+
+## GSAP & Webflow IX2 Auto-Pause
+
+Loady automatically detects and pauses GSAP and Webflow IX2 animations while the loader is active, preventing animation conflicts:
+
+- **GSAP** — pauses `gsap.globalTimeline` on init, resumes on `pageLoady:finished`
+- **Webflow IX2** — calls `destroy()` on the IX2 engine on init, re-initializes with `init()` on finish
+
+Both are auto-detected and paused by default. To opt out:
+
+```html
+<div data-loady="container" data-loady-gsap="false" data-loady-ix2="false">
+  ...
+</div>
+```
 
 ## URL Bypass
 
@@ -93,6 +122,7 @@ Append `?noloader=true` to any URL to skip the loader entirely. Useful during QA
 - **Ignore links** — excludes anchor links (`#section`), mailto, or any selector from triggering the loader
 - **Accessible** — sets `aria-busy="true"` on body, restores on finish
 - **MutationObserver** — auto-hides dynamically injected `[data-gsap-hide]` elements (CMS, infinite scroll)
+- **GSAP & IX2 auto-pause** — detects and pauses GSAP timelines and Webflow IX2 interactions during load, resumes on finish
 - **Zero dependencies** — pure vanilla JS, works with any framework or none
 
 ## Development
