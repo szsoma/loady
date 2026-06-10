@@ -1929,3 +1929,59 @@ describe('Counter monotonic guard', function () {
     vi.useRealTimers();
   });
 });
+
+describe('Dynamic img tracking via MutationObserver', function () {
+  beforeEach(function () {
+    vi.useFakeTimers();
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(function () {
+    vi.runAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('tracks dynamically injected images for threshold', async function () {
+    setupDOM('<div data-loady="container" data-loady-threshold="0.5" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var finished = false;
+    window.addEventListener('pageLoady:finished', function () { finished = true; });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    // Dynamically inject an image after loader init
+    var img = document.createElement('img');
+    img.src = 'dynamic.jpg';
+    document.body.appendChild(img);
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    // Fire load event on the dynamic image
+    img.dispatchEvent(new Event('load'));
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(finished).toBe(true);
+  });
+
+  it('still handles data-gsap-hide injection alongside img tracking', async function () {
+    setupDOM('<div data-loady="container" data-loady-failsafe="5000"><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var gsapEl = document.createElement('div');
+    gsapEl.setAttribute('data-gsap-hide', '');
+    document.body.appendChild(gsapEl);
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(gsapEl.style.visibility).toBe('hidden');
+    expect(gsapEl.style.opacity).toBe('0');
+  });
+});

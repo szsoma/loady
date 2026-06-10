@@ -279,12 +279,24 @@
       el.style.opacity = '0';
     }
 
+    function trackImage(img) {
+      totalCount++;
+      if (img.complete) {
+        onAssetResolved();
+        return;
+      }
+      img.addEventListener('load', onAssetResolved, { once: true });
+      img.addEventListener('error', onAssetResolved, { once: true });
+    }
+
     var observer = new MutationObserver(function (mutationsList) {
       mutationsList.forEach(function (mutation) {
         mutation.addedNodes.forEach(function (node) {
           if (node.nodeType !== 1) return;
           if (node.hasAttribute('data-gsap-hide')) hideGsapEl(node);
           node.querySelectorAll('[data-gsap-hide]').forEach(hideGsapEl);
+          if (node.tagName === 'IMG') trackImage(node);
+          node.querySelectorAll('img').forEach(trackImage);
         });
       });
     });
@@ -435,23 +447,23 @@
 
     function initAssetTracking() {
       var assets = document.querySelectorAll('img, iframe, video[src], script[src]');
-      totalCount = assets.length;
+      totalCount = 0;
+
+      var imgs = document.querySelectorAll('img');
+      imgs.forEach(function (img) {
+        trackImage(img);
+      });
+
+      var nonImgs = document.querySelectorAll('iframe, video[src], script[src]');
+      nonImgs.forEach(function (el) {
+        totalCount++;
+        el.addEventListener('load', onAssetResolved);
+        el.addEventListener('error', onAssetResolved);
+      });
 
       if (totalCount === 0) {
         percent = 85;
         removeLoader('No Assets');
-        return;
-      }
-
-      for (var i = 0; i < assets.length; i++) {
-        (function (el) {
-          if (el.tagName === 'IMG' && el.complete) {
-            onAssetResolved();
-            return;
-          }
-          el.addEventListener('load', onAssetResolved);
-          el.addEventListener('error', onAssetResolved);
-        })(assets[i]);
       }
     }
 
