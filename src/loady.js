@@ -148,13 +148,13 @@
         loader.style.opacity = '';
         loader.style.transform = '';
 
-        setAnimState(loader, outboundAnim, 'initial');
+        setAnimState(loader, outboundAnim, 'initial', 'outbound');
 
         void loader.offsetHeight;
 
         loader.style.transition = buildTransition(duration, easing);
 
-        setAnimState(loader, outboundAnim, 'final');
+        setAnimState(loader, outboundAnim, 'final', 'outbound');
 
         function doNavigate() {
           if (vtEnabled && viewTransition === 'persistent') {
@@ -288,21 +288,25 @@
       return 'opacity ' + dur + 's ' + ease + ', transform ' + dur + 's ' + ease;
     }
 
-    function setAnimState(el, anim, phase) {
+    function setAnimState(el, anim, phase, context) {
       var isSlide = anim === 'slide-up' || anim === 'slide-down';
-      if (phase === 'initial') {
-        if (isSlide) {
-          var dir = anim === 'slide-down' ? '-100%' : '100%';
-          el.style.transform = 'translateY(' + dir + ')';
-        } else {
-          el.style.opacity = '0';
-        }
+      if (!isSlide) {
+        el.style.opacity = phase === 'initial' ? '0' : '1';
+        return;
+      }
+      if (phase === 'final') {
+        el.style.transform = 'translateY(0)';
+        return;
+      }
+      // phase === 'initial'
+      if (context === 'outbound') {
+        // Outbound: slide-down starts above, slide-up starts below
+        var dir = anim === 'slide-down' ? '-100%' : '100%';
+        el.style.transform = 'translateY(' + dir + ')';
       } else {
-        if (isSlide) {
-          el.style.transform = 'translateY(0)';
-        } else {
-          el.style.opacity = '1';
-        }
+        // animateOut: slide-up goes up, slide-down goes down
+        var dir = anim === 'slide-up' ? '-100%' : '100%';
+        el.style.transform = 'translateY(' + dir + ')';
       }
     }
 
@@ -344,7 +348,7 @@
 
       loader.style.transition = buildTransition(duration, easing);
 
-      setAnimState(loader, animType, 'initial');
+      setAnimState(loader, animType, 'initial', 'animateOut');
 
       setTimeout(completeLoader, duration * 1000);
     }
