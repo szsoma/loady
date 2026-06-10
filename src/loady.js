@@ -395,11 +395,10 @@
 
         var target = Math.min(percent, 85);
         if (target === 0) target = 85;
-        if (displayedPercent < target) {
-          displayedPercent = Math.min(displayedPercent + 0.5, target);
-        }
+        var next = displayedPercent + 0.5;
+        displayedPercent = Math.max(displayedPercent, Math.min(next, target));
 
-        var displayVal = Math.round(displayedPercent);
+        var displayVal = Math.round(Math.min(displayedPercent, 100));
 
         if (counterEl) counterEl.textContent = displayVal + '%';
         if (barEl) barEl.style.width = displayVal + '%';

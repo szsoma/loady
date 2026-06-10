@@ -1879,3 +1879,53 @@ describe('pageLoady:finished has detail.source', function () {
     expect(eventDetail.source).toBe('bfcache');
   });
 });
+
+describe('Counter monotonic guard', function () {
+  beforeEach(function () {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(function () {
+    vi.restoreAllMocks();
+  });
+
+  it('counter never decreases during normal operation', async function () {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container" data-loady-failsafe="5000"><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var counterEl = document.querySelector('[data-loady-counter]');
+    var previousValue = 0;
+
+    for (var step = 0; step < 10; step++) {
+      await vi.advanceTimersByTimeAsync(200);
+      var currentValue = parseInt(counterEl.textContent, 10);
+      expect(currentValue).toBeGreaterThanOrEqual(previousValue);
+      previousValue = currentValue;
+    }
+
+    vi.useRealTimers();
+  });
+
+  it('counter caps at 100 and never exceeds', async function () {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await vi.advanceTimersByTimeAsync(500);
+
+    var counterEl = document.querySelector('[data-loady-counter]');
+    var value = parseInt(counterEl.textContent, 10);
+    expect(value).toBeLessThanOrEqual(100);
+
+    vi.useRealTimers();
+  });
+});
