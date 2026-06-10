@@ -1796,3 +1796,86 @@ describe('navigating flag prevents double clicks', function () {
     expect(navigationCount).toBe(1);
   });
 });
+
+describe('pageLoady:finished has detail.source', function () {
+  beforeEach(function () {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '' },
+    });
+  });
+
+  afterEach(function () {
+    vi.restoreAllMocks();
+    Object.defineProperty(window, 'location', { writable: true });
+  });
+
+  it('pageLoady:finished contains detail.source=normal in normal flow', async function () {
+    setupDOM('<div data-loady="container" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var eventDetail = null;
+    window.addEventListener('pageLoady:finished', function (e) {
+      eventDetail = e.detail;
+    });
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(function (r) { setTimeout(r, 300); });
+
+    expect(eventDetail).not.toBeNull();
+    expect(eventDetail.source).toBe('normal');
+  });
+
+  it('pageLoady:finished contains detail.source=noloader on bypass', async function () {
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '?noloader=true' },
+    });
+
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+
+    var eventDetail = null;
+    window.addEventListener('pageLoady:finished', function (e) {
+      eventDetail = e.detail;
+    });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    expect(eventDetail).not.toBeNull();
+    expect(eventDetail.source).toBe('noloader');
+
+    Object.defineProperty(window, 'location', { writable: true });
+  });
+
+  it('pageLoady:finished contains detail.source=bfcache on bfcache restore', async function () {
+    setupDOM('<div data-loady="container" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var eventDetail = null;
+    window.addEventListener('pageLoady:finished', function (e) {
+      eventDetail = e.detail;
+    });
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(function (r) { setTimeout(r, 300); });
+
+    // Reset the variable before bfcache event
+    eventDetail = null;
+
+    var pageshowEvent = new Event('pageshow');
+    Object.defineProperty(pageshowEvent, 'persisted', { value: true });
+    window.dispatchEvent(pageshowEvent);
+
+    expect(eventDetail).not.toBeNull();
+    expect(eventDetail.source).toBe('bfcache');
+  });
+});

@@ -57,13 +57,13 @@
     if (urlParams.get('noloader') === 'true') {
       sessionStorage.removeItem(SEEN_KEY);
       sessionStorage.removeItem(IGNORE_KEY);
-      completeLoader();
+      completeLoader('noloader');
       return;
     }
 
     var runOnce = loader.getAttribute('data-loady-once') === 'true';
     if (runOnce && sessionStorage.getItem(SEEN_KEY) === 'true') {
-      completeLoader();
+      completeLoader('normal');
       return;
     }
     if (runOnce) {
@@ -72,7 +72,7 @@
 
     if (sessionStorage.getItem(IGNORE_KEY) === '1') {
       sessionStorage.removeItem(IGNORE_KEY);
-      completeLoader();
+      completeLoader('normal');
       return;
     }
 
@@ -81,7 +81,7 @@
     if (duration < 0.1 && duration !== 0) duration = 0.1;
 
     if (duration === 0) {
-      completeLoader();
+      completeLoader('normal');
       return;
     }
 
@@ -354,27 +354,28 @@
 
       setAnimState(loader, animType, 'initial', 'animateOut');
 
-      setTimeout(completeLoader, duration * 1000);
+      setTimeout(function () { completeLoader('normal'); }, duration * 1000);
     }
 
-    function cleanupLoader() {
+    function cleanupLoader(source) {
       loader.style.display = 'none';
       document.body.removeAttribute('data-loady-status');
       document.body.removeAttribute('aria-busy');
       if (observer) observer.disconnect();
-      if (cleanupRefs.pageshow) window.removeEventListener('pageshow', cleanupRefs.pageshow);
       tickCancelled = true;
       if (gen === window._loadyGen) {
-        window.dispatchEvent(new CustomEvent('pageLoady:finished'));
+        window.dispatchEvent(new CustomEvent('pageLoady:finished', {
+          detail: { source: source },
+        }));
       }
     }
 
-    function completeLoader() {
+    function completeLoader(source) {
       phase = 'animating';
       dispatchProgress(100, 'animating');
       resumeGSAP();
       resumeIX2();
-      cleanupLoader();
+      cleanupLoader(source);
     }
 
     function renderComplete() {
@@ -468,7 +469,7 @@
       if (event.persisted) {
         resumeGSAP();
         resumeIX2();
-        cleanupLoader();
+        cleanupLoader('bfcache');
       }
     };
     window.addEventListener('pageshow', cleanupRefs.pageshow);
