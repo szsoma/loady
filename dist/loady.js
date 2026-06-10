@@ -42,28 +42,31 @@
       var loader = document.querySelector('[data-loady="container"]');
       if (!loader) return;
 
+      try {
+      var cleanupRefs = {};
+
       var gen = (window._loadyGen = (window._loadyGen || 0) + 1);
 
       var skipGSAP = loader.getAttribute('data-loady-gsap') === 'false';
-      if (!skipGSAP) pauseGSAP();
+      try { if (!skipGSAP) pauseGSAP(); } catch (e) {}
 
       var viewTransition = loader.getAttribute('data-loady-view-transition');
 
       var skipIX2 = loader.getAttribute('data-loady-ix2') === 'false';
       var forceIX2 = !!viewTransition;
-      if (!skipIX2 || forceIX2) pauseIX2();
+      try { if (!skipIX2 || forceIX2) pauseIX2(); } catch (e) {}
 
       var urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('noloader') === 'true') {
         sessionStorage.removeItem(SEEN_KEY);
         sessionStorage.removeItem(IGNORE_KEY);
-        finishImmediately();
+        completeLoader('noloader');
         return;
       }
 
       var runOnce = loader.getAttribute('data-loady-once') === 'true';
       if (runOnce && sessionStorage.getItem(SEEN_KEY) === 'true') {
-        finishImmediately();
+        completeLoader('normal');
         return;
       }
       if (runOnce) {
@@ -72,13 +75,20 @@
 
       if (sessionStorage.getItem(IGNORE_KEY) === '1') {
         sessionStorage.removeItem(IGNORE_KEY);
-        finishImmediately();
+        completeLoader('normal');
+        return;
+      }
+
+      var durationVal = parseFloat(loader.getAttribute('data-loady-duration'));
+      var duration = isNaN(durationVal) ? 0.5 : durationVal;
+      if (duration < 0.1 && duration !== 0) duration = 0.1;
+
+      if (duration === 0) {
+        completeLoader('normal');
         return;
       }
 
       var animType = loader.getAttribute('data-loady-anim') || 'fade';
-      var durationVal = parseFloat(loader.getAttribute('data-loady-duration'));
-      var duration = isNaN(durationVal) ? 0.5 : durationVal;
       var failsafeVal = parseInt(loader.getAttribute('data-loady-failsafe'), 10);
       var failsafeTime = isNaN(failsafeVal) ? 5000 : failsafeVal;
       var minVal = parseInt(loader.getAttribute('data-loady-min'), 10);
@@ -93,7 +103,11 @@
       var prefetchEnabled = loader.getAttribute('data-loady-prefetch') === 'true';
       var ignoreList = loader.getAttribute('data-loady-ignore');
 
-      var vtSupported = typeof document.startViewTransition === 'function';
+      try {
+        var vtSupported = typeof document.startViewTransition === 'function';
+      } catch (e) {
+        var vtSupported = false;
+      }
       var vtEnabled = viewTransition && vtSupported;
 
       function isQualifyingLink(anchor) {
@@ -113,6 +127,7 @@
       }
 
       if (ignoreList || outboundAnim) {
+        var navigating = false;
         document.addEventListener('click', function (e) {
           if (ignoreList && e.target.closest(ignoreList)) {
             sessionStorage.setItem(IGNORE_KEY, '1');
@@ -124,7 +139,10 @@
 
           if (!outboundAnim || !isQualifyingLink(anchor)) return;
 
+          if (navigating) return;
+
           e.preventDefault();
+          navigating = true;
           var destinationUrl = anchor.href;
 
           var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -148,31 +166,13 @@
           loader.style.opacity = '';
           loader.style.transform = '';
 
-          switch (outboundAnim) {
-            case 'slide-down':
-              loader.style.transform = 'translateY(-100%)';
-              break;
-            case 'slide-up':
-              loader.style.transform = 'translateY(100%)';
-              break;
-            case 'fade':
-            default:
-              loader.style.opacity = '0';
-          }
+          setAnimState(loader, outboundAnim, 'initial', 'outbound');
 
           void loader.offsetHeight;
 
-          loader.style.transition = 'all ' + duration + 's ' + easing;
+          loader.style.transition = buildTransition(duration, easing);
 
-          switch (outboundAnim) {
-            case 'slide-down':
-            case 'slide-up':
-              loader.style.transform = 'translateY(0)';
-              break;
-            case 'fade':
-            default:
-              loader.style.opacity = '1';
-          }
+          setAnimState(loader, outboundAnim, 'final', 'outbound');
 
           function doNavigate() {
             if (vtEnabled && viewTransition === 'persistent') {
@@ -230,6 +230,29 @@
             clearTimeout(timer);
           }, { once: true });
         });
+
+        document.addEventListener('touchstart', function (e) {
+          var anchor = e.target.closest('a');
+          if (!anchor || !isQualifyingLink(anchor)) return;
+
+          var connection = navigator.connection;
+          if (connection) {
+            if (connection.saveData) return;
+            if (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g') return;
+          }
+
+          var timer = setTimeout(function () {
+            prefetch(anchor.href);
+          }, 80);
+
+          var onEnd = function () {
+            clearTimeout(timer);
+            anchor.removeEventListener('touchend', onEnd);
+            anchor.removeEventListener('touchcancel', onEnd);
+          };
+          anchor.addEventListener('touchend', onEnd, { once: true });
+          anchor.addEventListener('touchcancel', onEnd, { once: true });
+        });
       }
 
       var startTime = Date.now();
@@ -260,6 +283,14 @@
       var phase = 'loading';
       var loadedCount = 0;
       var totalCount = 0;
+      var tickCancelled = false;
+
+      function dispatchProgress(pct, ph) {
+        if (gen !== window._loadyGen) return;
+        window.dispatchEvent(new CustomEvent('pageLoady:progress', {
+          detail: { percent: pct, raw: +(pct / 100).toFixed(4), phase: ph },
+        }));
+      }
 
       document.body.setAttribute('data-loady-status', 'loading');
       document.body.setAttribute('aria-busy', 'true');
@@ -267,32 +298,63 @@
       startProgress();
       initAssetTracking();
 
-      var observer = new MutationObserver(function (mutationsList) {
-        for (var i = 0; i < mutationsList.length; i++) {
-          var mutation = mutationsList[i];
-          if (mutation.addedNodes.length > 0) {
-            for (var j = 0; j < mutation.addedNodes.length; j++) {
-              var node = mutation.addedNodes[j];
-              if (node.nodeType === 1) {
-                if (node.hasAttribute('data-gsap-hide')) {
-                  node.style.visibility = 'hidden';
-                  node.style.opacity = '0';
-                }
-                var hiddenChildren = node.querySelectorAll('[data-gsap-hide]');
-                for (var k = 0; k < hiddenChildren.length; k++) {
-                  hiddenChildren[k].style.visibility = 'hidden';
-                  hiddenChildren[k].style.opacity = '0';
-                }
-              }
-            }
-          }
+      function hideGsapEl(el) {
+        el.style.visibility = 'hidden';
+        el.style.opacity = '0';
+      }
+
+      function trackImage(img) {
+        totalCount++;
+        if (img.complete) {
+          onAssetResolved();
+          return;
         }
+        img.addEventListener('load', onAssetResolved, { once: true });
+        img.addEventListener('error', onAssetResolved, { once: true });
+      }
+
+      var observer = new MutationObserver(function (mutationsList) {
+        mutationsList.forEach(function (mutation) {
+          mutation.addedNodes.forEach(function (node) {
+            if (node.nodeType !== 1) return;
+            if (node.hasAttribute('data-gsap-hide')) hideGsapEl(node);
+            node.querySelectorAll('[data-gsap-hide]').forEach(hideGsapEl);
+            if (node.tagName === 'IMG') trackImage(node);
+            node.querySelectorAll('img').forEach(trackImage);
+          });
+        });
       });
 
       observer.observe(document.body, {
         childList: true,
         subtree: true,
       });
+
+      function buildTransition(dur, ease) {
+        return 'opacity ' + dur + 's ' + ease + ', transform ' + dur + 's ' + ease;
+      }
+
+      function setAnimState(el, anim, phase, context) {
+        var isSlide = anim === 'slide-up' || anim === 'slide-down';
+        if (!isSlide) {
+          el.style.opacity = phase === 'initial' ? '0' : '1';
+          return;
+        }
+        if (phase === 'final') {
+          el.style.transform = 'translateY(0)';
+          return;
+        }
+        // phase === 'initial'
+        if (context === 'outbound') {
+          // Outbound: slide-down starts above, slide-up starts below
+          var dir = anim === 'slide-down' ? '-100%' : '100%';
+          el.style.transform = 'translateY(' + dir + ')';
+        } else {
+          // animateOut: slide-up goes up, slide-down goes down
+          var dir = anim === 'slide-up' ? '-100%' : '100%';
+          el.style.transform = 'translateY(' + dir + ')';
+        }
+      }
 
       function logDebug(triggerSource) {
         if (!isDebug) return;
@@ -330,58 +392,36 @@
         percent = 100;
         snapCounterTo100();
 
-        loader.style.transition = 'all ' + duration + 's ' + easing;
+        loader.style.transition = buildTransition(duration, easing);
 
-        switch (animType) {
-          case 'slide-up':
-            loader.style.transform = 'translateY(-100%)';
-            break;
-          case 'slide-down':
-            loader.style.transform = 'translateY(100%)';
-            break;
-          case 'fade':
-          default:
-            loader.style.opacity = '0';
-        }
+        setAnimState(loader, animType, 'initial', 'animateOut');
 
-        setTimeout(finish, duration * 1000);
+        setTimeout(function () { completeLoader('normal'); }, duration * 1000);
       }
 
-      function cleanupLoader() {
+      function cleanupLoader(source) {
         loader.style.display = 'none';
         document.body.removeAttribute('data-loady-status');
         document.body.removeAttribute('aria-busy');
+        if (observer) observer.disconnect();
+        tickCancelled = true;
         if (gen === window._loadyGen) {
-          window.dispatchEvent(new CustomEvent('pageLoady:finished'));
-        }
-      }
-
-      function finish() {
-        if (gen === window._loadyGen) {
-          window.dispatchEvent(new CustomEvent('pageLoady:progress', {
-            detail: { percent: 100, raw: 1, phase: 'animating' },
+          window.dispatchEvent(new CustomEvent('pageLoady:finished', {
+            detail: { source: source },
           }));
         }
-        observer.disconnect();
-        resumeGSAP();
-        resumeIX2();
-        cleanupLoader();
       }
 
-      function finishImmediately() {
+      function completeLoader(source) {
         phase = 'animating';
-        if (gen === window._loadyGen) {
-          window.dispatchEvent(new CustomEvent('pageLoady:progress', {
-            detail: { percent: 100, raw: 1, phase: 'animating' },
-          }));
-        }
+        dispatchProgress(100, 'animating');
         resumeGSAP();
         resumeIX2();
-        cleanupLoader();
+        cleanupLoader(source);
       }
 
       function renderComplete() {
-        counterEl.textContent = '100%';
+        if (counterEl) counterEl.textContent = '100%';
         if (barEl) barEl.style.width = '100%';
       }
 
@@ -390,32 +430,22 @@
         var interval = 1000 / fps;
 
         function tick() {
-          if (counterDone) {
+          if (tickCancelled || counterDone) {
             renderComplete();
             return;
           }
 
           var target = Math.min(percent, 85);
           if (target === 0) target = 85;
-          if (displayedPercent < target) {
-            displayedPercent = Math.min(displayedPercent + 0.5, target);
-          }
+          var next = displayedPercent + 0.5;
+          displayedPercent = Math.max(displayedPercent, Math.min(next, target));
 
-          var displayVal = Math.round(displayedPercent);
+          var displayVal = Math.round(Math.min(displayedPercent, 100));
 
           if (counterEl) counterEl.textContent = displayVal + '%';
           if (barEl) barEl.style.width = displayVal + '%';
 
-          if (gen === window._loadyGen) {
-            var progressVal = Math.min(percent, 85);
-            window.dispatchEvent(new CustomEvent('pageLoady:progress', {
-              detail: {
-                percent: progressVal,
-                raw: +(progressVal / 100).toFixed(4),
-                phase: phase,
-              },
-            }));
-          }
+          dispatchProgress(Math.min(percent, 85), phase);
 
           requestAnimationFrame(function () {
             setTimeout(tick, interval);
@@ -433,12 +463,7 @@
         } else {
           percent = Math.round((loadedCount / totalCount) * 85);
         }
-        if (gen === window._loadyGen) {
-          var val = Math.min(percent, 85);
-          window.dispatchEvent(new CustomEvent('pageLoady:progress', {
-            detail: { percent: val, raw: +(val / 100).toFixed(4), phase: phase },
-          }));
-        }
+        dispatchProgress(Math.min(percent, 85), phase);
         if (totalCount > 0 && (loadedCount / totalCount) >= threshold) {
           removeLoader('Threshold');
         }
@@ -446,23 +471,23 @@
 
       function initAssetTracking() {
         var assets = document.querySelectorAll('img, iframe, video[src], script[src]');
-        totalCount = assets.length;
+        totalCount = 0;
+
+        var imgs = document.querySelectorAll('img');
+        imgs.forEach(function (img) {
+          trackImage(img);
+        });
+
+        var nonImgs = document.querySelectorAll('iframe, video[src], script[src]');
+        nonImgs.forEach(function (el) {
+          totalCount++;
+          el.addEventListener('load', onAssetResolved);
+          el.addEventListener('error', onAssetResolved);
+        });
 
         if (totalCount === 0) {
           percent = 85;
           removeLoader('No Assets');
-          return;
-        }
-
-        for (var i = 0; i < assets.length; i++) {
-          (function (el) {
-            if (el.tagName === 'IMG' && el.complete) {
-              onAssetResolved();
-              return;
-            }
-            el.addEventListener('load', onAssetResolved);
-            el.addEventListener('error', onAssetResolved);
-          })(assets[i]);
         }
       }
 
@@ -481,15 +506,18 @@
         removeLoader('Failsafe');
       }, failsafeTime);
 
-      window.addEventListener('pageshow', function (event) {
+      cleanupRefs.pageshow = function (event) {
         if (event.persisted) {
-          loader.style.display = 'none';
-          document.body.style.overflow = '';
-          document.body.removeAttribute('data-loady-status');
-          document.body.removeAttribute('aria-busy');
-          window.dispatchEvent(new CustomEvent('pageLoady:finished'));
+          resumeGSAP();
+          resumeIX2();
+          cleanupLoader('bfcache');
         }
-      });
+      };
+      window.addEventListener('pageshow', cleanupRefs.pageshow);
+
+      } catch (e) {
+        console.error('[Loady] Initialization failed:', e);
+      }
     });
   })();
 

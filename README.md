@@ -1,62 +1,68 @@
 # Loady
 
-FOUC-free page loader orchestrator for GSAP-powered websites. Drop it in, configure with data attributes, ship it.
+FOUC-free page loader orchestrator for GSAP-powered websites.
 
-**~2KB minified, zero dependencies.**
+**~3.5 KB gzipped (JS + CSS), zero dependencies.**
 
-## How it works
+## Table of Contents
 
-1. Paste the CSS in `<head>` to hide elements and lock scroll instantly (no FOUC).
-2. Add a loader element with `data-loady="container"`.
-3. Drop the script on your page. It waits for assets to load, plays an exit animation, then dispatches `pageLoady:finished`.
-4. Your GSAP code listens for that event and starts your animations.
+- [Quickstart](#quickstart)
+- [How It Works](#how-it-works)
+- [Installation](#installation)
+- [Configuration](#configuration)
+  - [Loader Container](#loader-container)
+  - [Animation](#animation)
+  - [Timing](#timing)
+  - [Progress Tracking](#progress-tracking)
+  - [Link Handling](#link-handling)
+  - [Outbound Transitions](#outbound-transitions)
+  - [Prefetch](#prefetch)
+  - [View Transitions](#view-transitions)
+  - [Session Behavior](#session-behavior)
+  - [Auto-Pause](#auto-pause)
+  - [Debug](#debug)
+- [Events](#events)
+  - [pageLoady:finished](#pageloadyfinished)
+  - [pageLoady:progress](#pageloadyprogress)
+- [GSAP & Webflow IX2 Integration](#gsap--webflow-ix2-integration)
+- [How Loaders Exit](#how-loaders-exit)
+- [Back Button Behavior](#back-button-behavior)
+- [URL Bypass](#url-bypass)
+- [Features](#features)
+- [Development](#development)
+- [File Sizes](#file-sizes)
+- [Demo](#demo)
+- [License](#license)
 
-## Installation
+---
 
-### 1. Add the CSS to `<head>`
+## Quickstart
+
+Get a working loader in under 2 minutes.
+
+**1. Add the CSS to `<head>`**
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/szsoma/loady@main/loady.css">
+<head>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/szsoma/loady@main/loady.css">
+</head>
 ```
 
-If you've tagged a release, replace `@main` with the version (e.g. `@1.0.0`).
-
-This snippet:
-- Hides elements with `[data-gsap-hide]` until animations are ready
-- Locks `overflow` on `body` while the loader is active
-- Positions the loader fixed full-screen with maximum z-index
-
-### 2. Add the script before `</body>`
+**2. Add the script before `</body>`**
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/szsoma/loady@main/dist/loady.min.js"></script>
+<body>
+  <!-- Your content here -->
+
+  <div data-loady="container">
+    <div class="my-loader">Loading...</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/gh/szsoma/loady@main/dist/loady.min.js"></script>
 </body>
 ```
 
-If you've tagged a release, replace `@main` with the version (e.g. `@1.0.0`).
-
-jsDelivr caches files aggressively. To purge a cached file after a push, open this URL in your browser: `https://purge.jsdelivr.net/gh/szsoma/loady@main/dist/loady.min.js`.
-
-#### ESM usage
-
-For module-based setups, import the ESM build instead:
-
-```html
-<script type="module">
-  import 'https://cdn.jsdelivr.net/gh/szsoma/loady@main/dist/loady.esm.min.js';
-</script>
-```
-
-### 3. Mark up your loader
-
-```html
-<div data-loady="container" data-loady-anim="slide-up" data-loady-min="1200">
-  <div class="my-loader">Loading...</div>
-  <span data-loady-counter>0%</span>
-</div>
-```
-
-### 4. Hook up GSAP
+**3. Hook up GSAP**
 
 ```html
 <script>
@@ -67,83 +73,335 @@ For module-based setups, import the ESM build instead:
 </script>
 ```
 
-## Data Attribute API
+Done. The loader waits for assets to load, plays a fade-out, then fires `pageLoady:finished` for your GSAP code.
+
+---
+
+## How It Works
+
+Loady runs entirely client-side with no build step.
+
+1. The CSS hides `[data-gsap-hide]` elements and locks body scroll synchronously in `<head>` — no flash of unstyled content.
+2. On `DOMContentLoaded`, the script locates `[data-loady="container"]`, parses its data attributes, and starts tracking assets (`img`, `iframe`, `video[src]`, `script[src]`).
+3. As assets load, a progress counter moves from 0% to 85%. A `pageLoady:progress` event fires at ~30fps.
+4. When all assets finish (or the failsafe timeout fires), the loader plays its exit animation.
+5. On exit, `pageLoady:finished` fires on `window`. Your code listens for it and starts animations.
+
+---
+
+## Installation
+
+### CDN (Recommended)
+
+Replace `@main` with a tagged version (e.g. `@1.0.0`) for pinned releases.
+
+**CSS** — add in `<head>`:
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/szsoma/loady@main/loady.css">
+```
+
+This does three things:
+- Hides `[data-gsap-hide]` elements until animations are ready
+- Locks `overflow: hidden` on body while the loader is active
+- Positions the loader fixed full-screen with maximum z-index
+
+**Script** — add before `</body>`:
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/szsoma/loady@main/dist/loady.min.js"></script>
+```
+
+**Purge cache after push:**
+
+```
+https://purge.jsdelivr.net/gh/szsoma/loady@main/dist/loady.min.js
+```
+
+### ESM
+
+```html
+<script type="module">
+  import 'https://cdn.jsdelivr.net/gh/szsoma/loady@main/dist/loady.esm.min.js';
+</script>
+```
+
+### NPM + Bundler
+
+```sh
+npm install loady
+```
+
+```js
+import 'loady/loady.css';
+import 'loady';
+```
+
+---
+
+## Configuration
+
+All configuration is done via `data-*` attributes on the loader container. No JavaScript API required.
+
+### Loader Container
+
+| Attribute | Value | Description |
+|-----------|-------|-------------|
+| `data-loady` | `"container"` | **Required.** Identifies the loader wrapper element. |
+| `data-gsap-hide` | *(any)* | Add to elements to hide them until `pageLoady:finished` fires. Auto-hidden for dynamically injected nodes via MutationObserver. |
+
+```html
+<div data-loady="container">
+  <div class="spinner"></div>
+</div>
+
+<section data-gsap-hide>
+  <h1>Hero Content</h1>
+</section>
+```
+
+### Animation
+
+| Attribute | Default | Values |
+|-----------|---------|--------|
+| `data-loady-anim` | `fade` | `fade`, `slide-up`, `slide-down` |
+| `data-loady-easing` | `ease-in-out` | Any CSS easing (`linear`, `ease`, `cubic-bezier(...)`) |
+| `data-loady-duration` | `0.5` | Seconds. Minimum effective value is `0.1`. Set to `0` for instant hide. |
+
+```html
+<div data-loady="container" data-loady-anim="slide-up" data-loady-duration="0.8" data-loady-easing="cubic-bezier(0.16, 1, 0.3, 1)">
+```
+
+### Timing
 
 | Attribute | Default | Description |
-|---|---|---|
-| `data-loady="container"` | — | Identifies the loader wrapper (required) |
-| `data-gsap-hide` | — | Add to any element to hide it until `pageLoady:finished` fires (set via CSS, auto-hidden for dynamically injected nodes too) |
-| `data-loady-anim` | `fade` | Exit animation: `fade`, `slide-up`, `slide-down` |
-| `data-loady-easing` | `ease-in-out` | CSS easing function for the exit animation. See hint: https://easings.net (e.g. `linear`, `ease`, `cubic-bezier(...)`) |
-| `data-loady-duration` | `0.5` | Exit animation duration in seconds |
-| `data-loady-failsafe` | `5000` | Max wait in ms before force-dismissing the loader |
-| `data-loady-min` | `0` | Minimum display time in ms (prevents flash on cached pages) |
-| `data-loady-counter` | — | Animate a child element from 0% to 85% (snaps to 100% on load) |
-| `data-loady-bar` | — | Target a child element to sync its width with the progress |
-| `data-loady-ignore` | — | CSS selector for links that should skip the loader on next navigation |
-| `data-loady-once` | `false` | Only show the loader once per tab session (uses `sessionStorage`; resets when the tab closes) |
-| `data-loady-debug` | `false` | Log performance metrics to the console on loader exit |
-| `data-loady-threshold` | `1.0` | Fraction of tracked assets (0.0–1.0) that must resolve before exit begins. `1.0` = all assets (default). |
-| `data-loady-gsap` | `true` | Set to `false` to skip auto-pausing GSAP's `globalTimeline` during load |
-| `data-loady-ix2` | `true` | Set to `false` to skip auto-pausing Webflow IX2 interactions during load |
+|-----------|---------|-------------|
+| `data-loady-failsafe` | `5000` | Max wait (ms) before force-dismissing. Prevents hangs. |
+| `data-loady-min` | `0` | Minimum display time (ms). Prevents flicker on cached pages. |
+| `data-loady-threshold` | `1.0` | Fraction of assets (0.0–1.0) that must load before exit begins. `0.5` = exit when half loaded. |
+
+```html
+<div data-loady="container" data-loady-failsafe="3000" data-loady-min="800" data-loady-threshold="0.8">
+```
+
+### Progress Tracking
+
+| Attribute | Description |
+|-----------|-------------|
+| `data-loady-counter` | Animate a child element from 0% to 85%, then snap to 100%. |
+| `data-loady-bar` | Sync a child element's `width` with the progress percentage. |
+
+```html
+<div data-loady="container">
+  <div class="loader-bg">
+    <div data-loady-bar class="loader-fill"></div>
+  </div>
+  <span data-loady-counter>0%</span>
+</div>
+```
+
+### Link Handling
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `data-loady-ignore` | *(none)* | CSS selector for links that skip the loader on next navigation. Clicking an ignored link sets a session flag so the next page load bypasses the loader. |
+
+```html
+<div data-loady="container" data-loady-ignore=".no-loader, [data-no-load]">
+```
+
+### Outbound Transitions
+
+| Attribute | Values | Description |
+|-----------|--------|-------------|
+| `data-loady-outbound` | `fade`, `slide-up`, `slide-down` | Enables outbound transitions. The value is the animation used when the loader re-appears before navigating. |
+
+When set, Loady intercepts same-origin link clicks, animates the loader in, then navigates.
+
+Qualifying links: same-origin, not `target="_blank"`, not hash-only, not matching `data-loady-ignore`, not the current page.
+
+```html
+<div data-loady="container" data-loady-anim="slide-up" data-loady-outbound="slide-down">
+```
+
+### Prefetch
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `data-loady-prefetch` | `false` | Injects `<link rel="prefetch">` after 80ms of cursor/touch dwell on a qualifying link. |
+
+Prefetching is suppressed on `saveData` and slow connections (`2g`, `slow-2g`). Each URL is prefetched at most once per page session.
+
+```html
+<div data-loady="container" data-loady-prefetch="true" data-loady-outbound="fade">
+```
+
+### View Transitions
+
+| Attribute | Values | Description |
+|-----------|--------|-------------|
+| `data-loady-view-transition` | `true`, `persistent` | Delegates between-pages transitions to the browser's View Transition API. Requires `data-loady-outbound`. |
+
+| Value | Effect |
+|-------|--------|
+| `true` | Full-page crossfade — browser captures old and new page, animates between them |
+| `persistent` | Loader persists across the navigation boundary via `view-transition-name` |
+
+Falls back to CSS animation if the API is unsupported.
+
+```html
+<div data-loady="container" data-loady-outbound="slide-down" data-loady-view-transition="persistent">
+```
+
+When view transitions are enabled, Loady also injects `@view-transition { navigation: auto; }`, giving non-intercepted navigations a native crossfade in supporting browsers.
+
+### Session Behavior
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `data-loady-once` | `false` | Show the loader only once per tab session. Uses `sessionStorage`; resets when the tab closes. |
+
+### Auto-Pause
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `data-loady-gsap` | `true` | Auto-pause `gsap.globalTimeline` during load. |
+| `data-loady-ix2` | `true` | Auto-pause Webflow IX2 interactions during load. |
+
+Both are auto-detected and paused by default. Opt out with `="false"`.
+
+```html
+<div data-loady="container" data-loady-gsap="false" data-loady-ix2="false">
+```
+
+### Debug
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `data-loady-debug` | `false` | Log performance metrics to the console on loader exit. |
+
+---
 
 ## Events
 
-| Event | Description |
-|---|---|
-| `pageLoady:finished` | Dispatched on `window` when the loader has fully exited. This is your signal to start GSAP animations. |
-| `pageLoady:progress` | Dispatched on `window` at ~30fps during load. `detail: { percent, raw, phase }`. Phase is `loading`, `min-wait`, or `animating`. |
+### `pageLoady:finished`
 
-## GSAP & Webflow IX2 Auto-Pause
+Fires on `window` when the loader has fully exited. This is your signal to start GSAP animations.
 
-Loady automatically detects and pauses GSAP and Webflow IX2 animations while the loader is active, preventing animation conflicts:
+```js
+window.addEventListener('pageLoady:finished', function (e) {
+  // e.detail.source: 'normal' | 'noloader' | 'bfcache'
+  gsap.set('[data-gsap-hide]', { autoAlpha: 1 });
+});
+```
+
+**`detail.source` values:**
+
+| Value | Meaning |
+|-------|---------|
+| `normal` | Loader completed its full cycle (asset loading, animation, min display time) |
+| `noloader` | Bypassed via `?noloader=true` query parameter |
+| `bfcache` | Page restored from back-forward cache |
+
+### `pageLoady:progress`
+
+Fires on `window` at ~30fps during loading. Use for custom progress renderers (Lottie, SVG, canvas, Three.js).
+
+```js
+window.addEventListener('pageLoady:progress', function (e) {
+  console.log(e.detail.percent);  // 0–100 integer
+  console.log(e.detail.raw);      // 0.0–1.0 float
+  console.log(e.detail.phase);    // 'loading' | 'min-wait' | 'animating'
+});
+```
+
+Progress is capped at 85% during loading and snaps to 100% when the exit animation begins.
+
+**Phase values:**
+
+| Phase | Meaning |
+|-------|---------|
+| `loading` | Actively waiting for assets to load |
+| `min-wait` | Assets loaded, waiting for minimum display time to elapse |
+| `animating` | Exit animation playing |
+
+---
+
+## GSAP & Webflow IX2 Integration
+
+Loady auto-detects and pauses GSAP and Webflow IX2 animations while the loader is active, preventing animation conflicts:
 
 - **GSAP** — pauses `gsap.globalTimeline` on init, resumes on `pageLoady:finished`
 - **Webflow IX2** — calls `destroy()` on the IX2 engine on init, re-initializes with `init()` on finish
 
-Both are auto-detected and paused by default. To opt out:
+Both are auto-detected and paused by default. Opt out:
 
 ```html
 <div data-loady="container" data-loady-gsap="false" data-loady-ix2="false">
-  ...
-</div>
 ```
 
-## Progress Event
+---
 
-`pageLoady:progress` fires on `window` during loading, exposing real-time progress for external renderers (Lottie, SVG, canvas, Three.js):
+## How Loaders Exit
 
-```js
-window.addEventListener('pageLoady:progress', ({ detail }) => {
-  console.log(detail.percent);  // 0–100 integer
-  console.log(detail.raw);      // 0.0–1.0 float
-  console.log(detail.phase);    // 'loading' | 'min-wait' | 'animating'
-});
-```
+Loady uses multiple exit triggers. The first one to fire wins — subsequent triggers are ignored (idempotent).
 
-The event shares the same internal progress value as `data-loady-counter` and `data-loady-bar`. Progress is capped at 85% during loading and snaps to 100% when the exit animation begins.
+| Trigger | Condition | Typical Timing |
+|---------|-----------|----------------|
+| **Threshold** | Fraction of tracked assets loaded (configurable via `data-loady-threshold`) | Variable |
+| **Window Load** | `window` load event fires | After all resources |
+| **Failsafe** | Configurable timeout (`data-loady-failsafe`, default 5000ms) | Fixed |
+| **Min Display** | Minimum display time elapsed (`data-loady-min`) | After threshold |
 
-Tracked assets: `img`, `iframe`, `video[src]`, `script[src]`.
+The exit sequence:
+1. `removeLoader()` — logs debug info, calculates remaining min display time, schedules `animateOut()`
+2. `animateOut()` — sets the exit animation via CSS transitions
+3. `completeLoader()` — fires final `pageLoady:progress` (100%), resumes GSAP/IX2, cleans up DOM, fires `pageLoady:finished`
+
+---
+
+## Back Button Behavior
+
+Loady listens for `pageshow` with `event.persisted` to handle bfcache restoration. On back/forward navigation, the loader is force-hidden and `pageLoady:finished` is dispatched with `source: 'bfcache'`.
+
+---
 
 ## URL Bypass
 
-Append `?noloader=true` to any URL to skip the loader entirely. Useful during QA and staging reviews.
+Append `?noloader=true` to any URL to skip the loader entirely. Useful during QA and staging.
+
+```
+https://example.com/page?noloader=true
+```
+
+---
 
 ## Features
 
-- **Anti-FOUC CSS** — synchronous `<head>` snippet prevents the 0.1s flash of unstyled content
-- **Event-driven handoff** — no coupling to GSAP internals; your code just listens for `pageLoady:finished`
-- **Exit animations** — fade, slide-up, slide-down via CSS transitions (extensible by adding CSS)
+- **Anti-FOUC CSS** — synchronous `<head>` snippet prevents the flash of unstyled content
+- **Event-driven handoff** — no coupling to GSAP internals; your code listens for `pageLoady:finished`
+- **Exit animations** — fade, slide-up, slide-down via CSS transitions
 - **Failsafe timeout** — configurable max wait so the loader can't hang indefinitely
-- **Minimum display time** — prevents flicker on cached pages that load in milliseconds
-- **Progress counter** — lightweight 0%→85% eased counter, snaps to 100% when loading completes
-- **Ignore links** — excludes anchor links (`#section`), mailto, or any selector from triggering the loader
-- **Accessible** — sets `aria-busy="true"` on body, restores on finish
-- **MutationObserver** — auto-hides dynamically injected `[data-gsap-hide]` elements (CMS, infinite scroll)
-- **GSAP & IX2 auto-pause** — detects and pauses GSAP timelines and Webflow IX2 interactions during load, resumes on finish
+- **Minimum display time** — prevents flicker on fast-loading pages
+- **Progress counter** — 0%→85% eased counter, snaps to 100% on exit
+- **Progress bar** — sync a child element's width with load progress
+- **Ignore links** — exclude any selector from triggering the loader
+- **Accessible** — sets `aria-busy="true"` on body during load
+- **MutationObserver** — auto-hides dynamically injected `[data-gsap-hide]` elements and tracks dynamically injected `<img>` tags for threshold progress
+- **GSAP & IX2 auto-pause** — detects and pauses GSAP timelines and Webflow IX2 interactions during load
 - **Progress event** — `pageLoady:progress` exposes real-time loading progress for custom renderers
-- **Threshold loading** — `data-loady-threshold` exits early when a fraction of assets have loaded
+- **Threshold loading** — exit early when a fraction of assets have loaded
+- **Outbound transitions** — animate the loader back in before navigating to the next page
+- **Hover prefetch** — pre-fetches destination HTML for near-instant page loads (mouse and touch)
+- **View transitions** — delegates between-pages transitions to the native View Transition API
+- **bfcache handling** — restores page state on back/forward navigation
+- **Duration safety** — clamps sub-0.1s durations to 0.1s; `duration=0` triggers instant hide
+- **navigating guard** — prevents double-click from triggering duplicate navigations
+- **try/catch guards** — catches initialization errors so a broken page doesn't crash silently
 - **Zero dependencies** — pure vanilla JS, works with any framework or none
+- **~3.5 KB gzipped** — CSS + JS combined
+
+---
 
 ## Development
 
@@ -151,16 +409,20 @@ Append `?noloader=true` to any URL to skip the loader entirely. Useful during QA
 npm install
 npm run build       # Build dist/ files
 npm run dev         # Watch mode
-npm test            # Run tests
+npm test            # Run tests (86 tests)
 ```
 
-Outputs four bundle formats to `dist/`:
-| File | Format |
-|---|---|
-| `loady.js` | IIFE (unminified) |
-| `loady.min.js` | IIFE (minified) |
-| `loady.esm.js` | ESM (unminified) |
-| `loady.esm.min.js` | ESM (minified) |
+### Output Formats
+
+| File | Format | Raw | Gzipped |
+|------|--------|-----|---------|
+| `dist/loady.js` | IIFE (unminified) | 16.7 KB | 4.0 KB |
+| `dist/loady.min.js` | IIFE (minified) | 7.8 KB | 2.9 KB |
+| `dist/loady.esm.js` | ESM (unminified) | 15.8 KB | 4.0 KB |
+| `dist/loady.esm.min.js` | ESM (minified) | 7.8 KB | 2.9 KB |
+| `loady.css` | CSS | 1.3 KB | 0.6 KB |
+
+---
 
 ## Demo
 
@@ -169,6 +431,8 @@ Open `demo/index.html` in a local server:
 ```sh
 npx serve .
 ```
+
+---
 
 ## License
 

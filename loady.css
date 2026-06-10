@@ -21,3 +21,34 @@ body[data-loady-status="loading"] {
   z-index: 99999;
   display: flex;
 }
+
+/* 4. View Transition keyframes (active only during startViewTransition) */
+::view-transition-old(root) {
+  animation: loady-vt-old var(--loady-duration, 0.5s) var(--loady-easing, ease-in-out) forwards;
+}
+
+::view-transition-new(root) {
+  animation: loady-vt-new var(--loady-duration, 0.5s) var(--loady-easing, ease-in-out) forwards;
+}
+
+@keyframes loady-vt-old {
+  from { opacity: 1; translate: 0 0; }
+  to   { opacity: 0; translate: 0 -40px; }
+}
+
+@keyframes loady-vt-new {
+  from { opacity: 0; translate: 0 40px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+/* 5. Reduced motion — suppress all loader and view transition animations */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+
+  [data-loady="container"] {
+    transition-duration: 0ms !important;
+  }
+}
