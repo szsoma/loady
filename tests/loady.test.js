@@ -739,6 +739,7 @@ describe('data-loady-threshold', () => {
 
 describe('isQualifyingLink (via outbound click)', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     sessionStorage.clear();
     document.body.innerHTML = '';
     document.body.removeAttribute('data-loady-status');
@@ -750,6 +751,8 @@ describe('isQualifyingLink (via outbound click)', () => {
   });
 
   afterEach(() => {
+    vi.runAllTimers();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     Object.defineProperty(window, 'location', { writable: true });
   });
@@ -847,6 +850,127 @@ describe('isQualifyingLink (via outbound click)', () => {
     var link = document.createElement('a');
     link.href = 'http://localhost:3000/about';
     link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    var prevented = !link.dispatchEvent(event);
+
+    expect(prevented).toBe(false);
+  });
+});
+
+describe('Outbound transitions (data-loady-outbound)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+    delete window._loadyGen;
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '', href: 'http://localhost:3000/', origin: 'http://localhost:3000' },
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Object.defineProperty(window, 'location', { writable: true });
+  });
+
+  it('navigates to destination after transitionend', async () => {
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 300));
+
+    link.click();
+
+    var loader = document.querySelector('[data-loady="container"]');
+    loader.dispatchEvent(new Event('transitionend'));
+
+    expect(window.location.href).toBe('http://localhost:3000/about');
+  });
+
+  it('sets loader visible and applies outbound animation styles', async () => {
+    setupDOM('<div data-loady="container" data-loady-outbound="slide-down" data-loady-duration="0.2"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 400));
+
+    link.click();
+
+    var loader = document.querySelector('[data-loady="container"]');
+    expect(loader.style.display).not.toBe('none');
+  });
+
+  it('navigates via failsafe when transitionend never fires', async () => {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    link.click();
+
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(window.location.href).toBe('http://localhost:3000/about');
+
+    vi.useRealTimers();
+  });
+
+  it('sets aria-busy during outbound animation', async () => {
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 300));
+
+    link.click();
+
+    expect(document.body.getAttribute('aria-busy')).toBe('true');
+  });
+
+  it('does not intercept current page URL', async () => {
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/';
+    link.textContent = 'Home';
     document.body.appendChild(link);
 
     await loadScript();

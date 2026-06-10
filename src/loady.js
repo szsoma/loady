@@ -103,11 +103,70 @@
       return true;
     }
 
-    if (outboundAnim) {
+    if (ignoreList || outboundAnim) {
       document.addEventListener('click', function (e) {
         var anchor = e.target.closest('a');
-        if (!isQualifyingLink(anchor)) return;
+        if (!anchor) return;
+
+        if (ignoreList && anchor.matches(ignoreList)) {
+          sessionStorage.setItem(IGNORE_KEY, '1');
+          return;
+        }
+
+        if (!outboundAnim || !isQualifyingLink(anchor)) return;
+
         e.preventDefault();
+        var destinationUrl = anchor.href;
+
+        document.body.setAttribute('aria-busy', 'true');
+        document.body.setAttribute('data-loady-status', 'loading');
+
+        loader.style.transition = 'none';
+        loader.style.display = 'flex';
+        loader.style.opacity = '';
+        loader.style.transform = '';
+
+        switch (outboundAnim) {
+          case 'slide-down':
+            loader.style.transform = 'translateY(-100%)';
+            break;
+          case 'slide-up':
+            loader.style.transform = 'translateY(100%)';
+            break;
+          case 'fade':
+          default:
+            loader.style.opacity = '0';
+        }
+
+        void loader.offsetHeight;
+
+        loader.style.transition = 'all ' + duration + 's ' + easing;
+
+        switch (outboundAnim) {
+          case 'slide-down':
+          case 'slide-up':
+            loader.style.transform = 'translateY(0)';
+            break;
+          case 'fade':
+          default:
+            loader.style.opacity = '1';
+        }
+
+        var navigated = false;
+        var failsafe = setTimeout(function () {
+          if (!navigated) {
+            navigated = true;
+            window.location.href = destinationUrl;
+          }
+        }, (duration * 1000) + 500);
+
+        loader.addEventListener('transitionend', function () {
+          if (!navigated) {
+            navigated = true;
+            clearTimeout(failsafe);
+            window.location.href = destinationUrl;
+          }
+        }, { once: true });
       });
     }
 
@@ -327,14 +386,6 @@
       renderComplete();
     }
 
-    if (ignoreList) {
-      document.addEventListener('click', function (e) {
-        var target = e.target.closest(ignoreList);
-        if (target) {
-          sessionStorage.setItem(IGNORE_KEY, '1');
-        }
-      });
-    }
 
     window.addEventListener('load', function () {
       removeLoader('Window Load');
