@@ -229,6 +229,29 @@
           clearTimeout(timer);
         }, { once: true });
       });
+
+      document.addEventListener('touchstart', function (e) {
+        var anchor = e.target.closest('a');
+        if (!anchor || !isQualifyingLink(anchor)) return;
+
+        var connection = navigator.connection;
+        if (connection) {
+          if (connection.saveData) return;
+          if (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g') return;
+        }
+
+        var timer = setTimeout(function () {
+          prefetch(anchor.href);
+        }, 80);
+
+        var onEnd = function () {
+          clearTimeout(timer);
+          anchor.removeEventListener('touchend', onEnd);
+          anchor.removeEventListener('touchcancel', onEnd);
+        };
+        anchor.addEventListener('touchend', onEnd, { once: true });
+        anchor.addEventListener('touchcancel', onEnd, { once: true });
+      });
     }
 
     var startTime = Date.now();

@@ -1985,3 +1985,71 @@ describe('Dynamic img tracking via MutationObserver', function () {
     expect(gsapEl.style.opacity).toBe('0');
   });
 });
+
+describe('Prefetch touch guard', function () {
+  beforeEach(function () {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '', href: 'http://localhost:3000/', origin: 'http://localhost:3000' },
+    });
+    document.querySelectorAll('link[rel="prefetch"]').forEach(function (el) { el.remove(); });
+  });
+
+  afterEach(function () {
+    vi.restoreAllMocks();
+    Object.defineProperty(window, 'location', { writable: true });
+    document.querySelectorAll('link[rel="prefetch"]').forEach(function (el) { el.remove(); });
+  });
+
+  it('prefetches on touchstart with 80ms hold', async function () {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container" data-loady-prefetch="true"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    link.dispatchEvent(new Event('touchstart', { bubbles: true }));
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    var prefetchLink = document.querySelector('link[rel="prefetch"]');
+    expect(prefetchLink).not.toBeNull();
+    expect(prefetchLink.href).toBe('http://localhost:3000/about');
+
+    vi.useRealTimers();
+  });
+
+  it('cancels touch prefetch on touchend before 80ms', async function () {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container" data-loady-prefetch="true"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    link.dispatchEvent(new Event('touchstart', { bubbles: true }));
+
+    await vi.advanceTimersByTimeAsync(40);
+
+    link.dispatchEvent(new Event('touchend', { bubbles: true }));
+
+    await vi.advanceTimersByTimeAsync(60);
+
+    expect(document.querySelector('link[rel="prefetch"]')).toBeNull();
+
+    vi.useRealTimers();
+  });
+});
