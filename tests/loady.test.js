@@ -28,7 +28,13 @@ function loadScript() {
 }
 
 function fireDOMContentLoaded() {
+  var origAdd = document.addEventListener;
+  document.addEventListener = function (type, fn, opts) {
+    if (type === 'click') _clickFns.push(fn);
+    return origAdd.call(document, type, fn, opts);
+  };
   document.dispatchEvent(new Event('DOMContentLoaded'));
+  document.addEventListener = origAdd;
 }
 
 function fireLoad() {
@@ -728,5 +734,127 @@ describe('data-loady-threshold', () => {
     await new Promise(r => setTimeout(r, 300));
 
     expect(finished).toBe(true);
+  });
+});
+
+describe('isQualifyingLink (via outbound click)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '', href: 'http://localhost:3000/', origin: 'http://localhost:3000' },
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Object.defineProperty(window, 'location', { writable: true });
+  });
+
+  it('intercepts same-origin link click when outbound is configured', async () => {
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    var prevented = !link.dispatchEvent(event);
+
+    expect(prevented).toBe(true);
+  });
+
+  it('does not intercept hash-only links', async () => {
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = '#section';
+    link.textContent = 'Section';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    var prevented = !link.dispatchEvent(event);
+
+    expect(prevented).toBe(false);
+  });
+
+  it('does not intercept cross-origin links', async () => {
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'https://external.com/page';
+    link.textContent = 'External';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    var prevented = !link.dispatchEvent(event);
+
+    expect(prevented).toBe(false);
+  });
+
+  it('does not intercept links with target="_blank"', async () => {
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.target = '_blank';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    var prevented = !link.dispatchEvent(event);
+
+    expect(prevented).toBe(false);
+  });
+
+  it('does not intercept links matching data-loady-ignore', async () => {
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-ignore=".skip" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.className = 'skip';
+    link.textContent = 'Skip';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    var prevented = !link.dispatchEvent(event);
+
+    expect(prevented).toBe(false);
+  });
+
+  it('does not intercept when outbound is not configured', async () => {
+    setupDOM('<div data-loady="container" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    var prevented = !link.dispatchEvent(event);
+
+    expect(prevented).toBe(false);
   });
 });

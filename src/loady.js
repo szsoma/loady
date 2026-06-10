@@ -84,6 +84,34 @@
     var thresholdVal = parseFloat(loader.getAttribute('data-loady-threshold'));
     var threshold = (isNaN(thresholdVal) || thresholdVal <= 0 || thresholdVal > 1) ? 1 : thresholdVal;
 
+    var outboundAnim = loader.getAttribute('data-loady-outbound');
+    var prefetchEnabled = loader.getAttribute('data-loady-prefetch') === 'true';
+    var ignoreList = loader.getAttribute('data-loady-ignore');
+
+    function isQualifyingLink(anchor) {
+      if (!anchor || anchor.tagName !== 'A') return false;
+      if (!anchor.href || anchor.href === '') return false;
+      if (anchor.target && anchor.target !== '_self') return false;
+      if (anchor.getAttribute('href').charAt(0) === '#') return false;
+      if (anchor.href === window.location.href) return false;
+      try {
+        var url = new URL(anchor.href);
+        if (url.origin !== window.location.origin) return false;
+      } catch (e) {
+        return false;
+      }
+      if (ignoreList && anchor.matches(ignoreList)) return false;
+      return true;
+    }
+
+    if (outboundAnim) {
+      document.addEventListener('click', function (e) {
+        var anchor = e.target.closest('a');
+        if (!isQualifyingLink(anchor)) return;
+        e.preventDefault();
+      });
+    }
+
     var startTime = Date.now();
     var perfStart = performance.now();
     var isLoaded = false;
