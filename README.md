@@ -83,6 +83,7 @@ For module-based setups, import the ESM build instead:
 | `data-loady-ignore` | — | CSS selector for links that should skip the loader on next navigation |
 | `data-loady-once` | `false` | Only show the loader once per tab session (uses `sessionStorage`; resets when the tab closes) |
 | `data-loady-debug` | `false` | Log performance metrics to the console on loader exit |
+| `data-loady-threshold` | `1.0` | Fraction of tracked assets (0.0–1.0) that must resolve before exit begins. `1.0` = all assets (default). |
 | `data-loady-gsap` | `true` | Set to `false` to skip auto-pausing GSAP's `globalTimeline` during load |
 | `data-loady-ix2` | `true` | Set to `false` to skip auto-pausing Webflow IX2 interactions during load |
 
@@ -91,6 +92,7 @@ For module-based setups, import the ESM build instead:
 | Event | Description |
 |---|---|
 | `pageLoady:finished` | Dispatched on `window` when the loader has fully exited. This is your signal to start GSAP animations. |
+| `pageLoady:progress` | Dispatched on `window` at ~30fps during load. `detail: { percent, raw, phase }`. Phase is `loading`, `min-wait`, or `animating`. |
 
 ## GSAP & Webflow IX2 Auto-Pause
 
@@ -106,6 +108,22 @@ Both are auto-detected and paused by default. To opt out:
   ...
 </div>
 ```
+
+## Progress Event
+
+`pageLoady:progress` fires on `window` during loading, exposing real-time progress for external renderers (Lottie, SVG, canvas, Three.js):
+
+```js
+window.addEventListener('pageLoady:progress', ({ detail }) => {
+  console.log(detail.percent);  // 0–100 integer
+  console.log(detail.raw);      // 0.0–1.0 float
+  console.log(detail.phase);    // 'loading' | 'min-wait' | 'animating'
+});
+```
+
+The event shares the same internal progress value as `data-loady-counter` and `data-loady-bar`. Progress is capped at 85% during loading and snaps to 100% when the exit animation begins.
+
+Tracked assets: `img`, `iframe`, `video[src]`, `script[src]`.
 
 ## URL Bypass
 
@@ -123,6 +141,8 @@ Append `?noloader=true` to any URL to skip the loader entirely. Useful during QA
 - **Accessible** — sets `aria-busy="true"` on body, restores on finish
 - **MutationObserver** — auto-hides dynamically injected `[data-gsap-hide]` elements (CMS, infinite scroll)
 - **GSAP & IX2 auto-pause** — detects and pauses GSAP timelines and Webflow IX2 interactions during load, resumes on finish
+- **Progress event** — `pageLoady:progress` exposes real-time loading progress for custom renderers
+- **Threshold loading** — `data-loady-threshold` exits early when a fraction of assets have loaded
 - **Zero dependencies** — pure vanilla JS, works with any framework or none
 
 ## Development

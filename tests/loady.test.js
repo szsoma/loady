@@ -483,3 +483,250 @@ describe('Debug mode includes GSAP/IX2 status', () => {
     expect(tableArg['IX2 Paused']).toBe(false);
   });
 });
+
+describe('pageLoady:progress event', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('dispatches progress event with correct shape during loading', async () => {
+    setupDOM('<div data-loady="container"><img src="a.jpg"><span data-loady-counter>0%</span></div>');
+
+    var progressEvents = [];
+    window.addEventListener('pageLoady:progress', function (e) {
+      progressEvents.push(e.detail);
+    });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    await new Promise(r => setTimeout(r, 100));
+
+    expect(progressEvents.length).toBeGreaterThan(0);
+    var evt = progressEvents[0];
+    expect(typeof evt.percent).toBe('number');
+    expect(typeof evt.raw).toBe('number');
+    expect(evt.phase).toBe('loading');
+    expect(evt.percent).toBeGreaterThanOrEqual(0);
+    expect(evt.percent).toBeLessThanOrEqual(85);
+    expect(evt.raw).toBeGreaterThanOrEqual(0);
+    expect(evt.raw).toBeLessThanOrEqual(0.85);
+  });
+
+  it('updates progress as images load', async () => {
+    setupDOM('<div data-loady="container"><img src="a.jpg"><img src="b.jpg"><span data-loady-counter>0%</span></div>');
+
+    var progressEvents = [];
+    window.addEventListener('pageLoady:progress', function (e) {
+      progressEvents.push(e.detail);
+    });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var imgs = document.querySelectorAll('img');
+    imgs[0].dispatchEvent(new Event('load'));
+
+    await new Promise(r => setTimeout(r, 100));
+
+    var afterOneLoad = progressEvents[progressEvents.length - 1];
+    expect(afterOneLoad.percent).toBeGreaterThan(0);
+  });
+
+  it('counts already-complete images as loaded', async () => {
+    setupDOM('<div data-loady="container"><img src="a.jpg"><span data-loady-counter>0%</span></div>');
+
+    var img = document.querySelector('img');
+    Object.defineProperty(img, 'complete', { value: true });
+
+    var progressEvents = [];
+    window.addEventListener('pageLoady:progress', function (e) {
+      progressEvents.push(e.detail);
+    });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    await new Promise(r => setTimeout(r, 100));
+
+    var last = progressEvents[progressEvents.length - 1];
+    expect(last.percent).toBe(85);
+    expect(last.raw).toBeCloseTo(0.85, 1);
+  });
+
+  it('fires final progress event with percent 100 and phase animating', async () => {
+    setupDOM('<div data-loady="container" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var progressEvents = [];
+    window.addEventListener('pageLoady:progress', function (e) {
+      progressEvents.push(e.detail);
+    });
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 300));
+
+    var finalEvt = progressEvents.find(function (e) { return e.phase === 'animating'; });
+    expect(finalEvt).toBeDefined();
+    expect(finalEvt.percent).toBe(100);
+    expect(finalEvt.raw).toBe(1);
+  });
+
+  it('fires progress event even without data-loady-counter element', async () => {
+    setupDOM('<div data-loady="container"><img src="a.jpg"></div>');
+
+    var progressEvents = [];
+    window.addEventListener('pageLoady:progress', function (e) {
+      progressEvents.push(e.detail);
+    });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    await new Promise(r => setTimeout(r, 100));
+
+    expect(progressEvents.length).toBeGreaterThan(0);
+  });
+
+  it('treats image error events as resolved', async () => {
+    setupDOM('<div data-loady="container"><img src="broken.jpg"><span data-loady-counter>0%</span></div>');
+
+    var progressEvents = [];
+    window.addEventListener('pageLoady:progress', function (e) {
+      progressEvents.push(e.detail);
+    });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var img = document.querySelector('img');
+    img.dispatchEvent(new Event('error'));
+
+    await new Promise(r => setTimeout(r, 100));
+
+    var last = progressEvents[progressEvents.length - 1];
+    expect(last.percent).toBe(85);
+  });
+});
+
+describe('data-loady-threshold', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('exits when threshold fraction of assets loaded (0.5)', async () => {
+    setupDOM('<div data-loady="container" data-loady-threshold="0.5" data-loady-duration="0.1"><img src="a.jpg"><img src="b.jpg"><span data-loady-counter>0%</span></div>');
+
+    let finished = false;
+    window.addEventListener('pageLoady:finished', function () { finished = true; });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var imgs = document.querySelectorAll('img');
+    imgs[0].dispatchEvent(new Event('load'));
+
+    await new Promise(r => setTimeout(r, 300));
+
+    expect(finished).toBe(true);
+  });
+
+  it('threshold 1.0 waits for all assets (default)', async () => {
+    setupDOM('<div data-loady="container" data-loady-threshold="1.0" data-loady-duration="0.1"><img src="a.jpg"><img src="b.jpg"><span data-loady-counter>0%</span></div>');
+
+    let finished = false;
+    window.addEventListener('pageLoady:finished', function () { finished = true; });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var imgs = document.querySelectorAll('img');
+    imgs[0].dispatchEvent(new Event('load'));
+
+    await new Promise(r => setTimeout(r, 100));
+    expect(finished).toBe(false);
+
+    imgs[1].dispatchEvent(new Event('load'));
+
+    await new Promise(r => setTimeout(r, 300));
+    expect(finished).toBe(true);
+  });
+
+  it('exits immediately when zero assets and any threshold', async () => {
+    setupDOM('<div data-loady="container" data-loady-threshold="0.5" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    let finished = false;
+    window.addEventListener('pageLoady:finished', function () { finished = true; });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    await new Promise(r => setTimeout(r, 300));
+
+    expect(finished).toBe(true);
+  });
+
+  it('failsafe still fires when threshold never crossed', async () => {
+    setupDOM('<div data-loady="container" data-loady-threshold="1.0" data-loady-failsafe="200" data-loady-duration="0.1"><img src="never-loads.jpg"><span data-loady-counter>0%</span></div>');
+
+    let finished = false;
+    window.addEventListener('pageLoady:finished', function () { finished = true; });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    await new Promise(r => setTimeout(r, 500));
+
+    expect(finished).toBe(true);
+  });
+
+  it('respects data-loady-min even when threshold crossed early', async () => {
+    setupDOM('<div data-loady="container" data-loady-threshold="0.5" data-loady-min="500" data-loady-duration="0.1"><img src="a.jpg"><img src="b.jpg"><span data-loady-counter>0%</span></div>');
+
+    let finished = false;
+    window.addEventListener('pageLoady:finished', function () { finished = true; });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var imgs = document.querySelectorAll('img');
+    imgs[0].dispatchEvent(new Event('load'));
+
+    await new Promise(r => setTimeout(r, 200));
+    expect(finished).toBe(false);
+
+    await new Promise(r => setTimeout(r, 500));
+    expect(finished).toBe(true);
+  });
+
+  it('window.load still triggers exit as fallback', async () => {
+    setupDOM('<div data-loady="container" data-loady-duration="0.1"><img src="a.jpg"><span data-loady-counter>0%</span></div>');
+
+    let finished = false;
+    window.addEventListener('pageLoady:finished', function () { finished = true; });
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(r => setTimeout(r, 300));
+
+    expect(finished).toBe(true);
+  });
+});

@@ -39,6 +39,8 @@
     var loader = document.querySelector('[data-loady="container"]');
     if (!loader) return;
 
+    var gen = (window._loadyGen = (window._loadyGen || 0) + 1);
+
     var skipGSAP = loader.getAttribute('data-loady-gsap') === 'false';
     if (!skipGSAP) pauseGSAP();
 
@@ -78,6 +80,9 @@
     var isDebug = loader.getAttribute('data-loady-debug') === 'true';
     var easing = loader.getAttribute('data-loady-easing') || 'ease-in-out';
 
+    var thresholdVal = parseFloat(loader.getAttribute('data-loady-threshold'));
+    var threshold = (isNaN(thresholdVal) || thresholdVal <= 0 || thresholdVal > 1) ? 1 : thresholdVal;
+
     var startTime = Date.now();
     var perfStart = performance.now();
     var isLoaded = false;
@@ -85,10 +90,16 @@
     var counterEl = loader.querySelector('[data-loady-counter]');
     var barEl = loader.querySelector('[data-loady-bar]');
 
+    var percent = 0;
+    var phase = 'loading';
+    var loadedCount = 0;
+    var totalCount = 0;
+
     document.body.setAttribute('data-loady-status', 'loading');
     document.body.setAttribute('aria-busy', 'true');
 
-    startCounter();
+    startProgress();
+    initAssetTracking();
 
     var observer = new MutationObserver(function (mutationsList) {
       for (var i = 0; i < mutationsList.length; i++) {
@@ -143,11 +154,14 @@
 
       var elapsed = Date.now() - startTime;
       var remaining = Math.max(0, minTime - elapsed);
+      if (remaining > 0) phase = 'min-wait';
 
       setTimeout(animateOut, remaining);
     }
 
     function animateOut() {
+      phase = 'animating';
+      percent = 100;
       snapCounterTo100();
 
       loader.style.transition = 'all ' + duration + 's ' + easing;
@@ -171,10 +185,17 @@
       loader.style.display = 'none';
       document.body.removeAttribute('data-loady-status');
       document.body.removeAttribute('aria-busy');
-      window.dispatchEvent(new CustomEvent('pageLoady:finished'));
+      if (gen === window._loadyGen) {
+        window.dispatchEvent(new CustomEvent('pageLoady:finished'));
+      }
     }
 
     function finish() {
+      if (gen === window._loadyGen) {
+        window.dispatchEvent(new CustomEvent('pageLoady:progress', {
+          detail: { percent: 100, raw: 1, phase: 'animating' },
+        }));
+      }
       observer.disconnect();
       resumeGSAP();
       resumeIX2();
@@ -182,6 +203,12 @@
     }
 
     function finishImmediately() {
+      phase = 'animating';
+      if (gen === window._loadyGen) {
+        window.dispatchEvent(new CustomEvent('pageLoady:progress', {
+          detail: { percent: 100, raw: 1, phase: 'animating' },
+        }));
+      }
       resumeGSAP();
       resumeIX2();
       cleanupLoader();
@@ -192,17 +219,9 @@
       if (barEl) barEl.style.width = '100%';
     }
 
-    function startCounter() {
-      if (!counterEl) return;
-
+    function startProgress() {
       var fps = 30;
       var interval = 1000 / fps;
-      var start = Date.now();
-      var target = 85;
-
-      function easeOutQuad(t) {
-        return t * (2 - t);
-      }
 
       function tick() {
         if (counterDone) {
@@ -210,23 +229,68 @@
           return;
         }
 
-        var elapsed = Date.now() - start;
-        var progress = Math.min(elapsed / 2000, 1);
-        var eased = easeOutQuad(progress);
-        var val = Math.round(eased * target);
+        var val = Math.min(percent, 85);
 
-        counterEl.textContent = val + '%';
+        if (counterEl) counterEl.textContent = val + '%';
         if (barEl) barEl.style.width = val + '%';
 
-        if (progress < 1) {
-          requestAnimationFrame(function () {
-            setTimeout(tick, interval);
-          });
+        if (gen === window._loadyGen) {
+          window.dispatchEvent(new CustomEvent('pageLoady:progress', {
+            detail: {
+              percent: val,
+              raw: +(val / 100).toFixed(4),
+              phase: phase,
+            },
+          }));
         }
+
+        requestAnimationFrame(function () {
+          setTimeout(tick, interval);
+        });
       }
 
-      counterEl.textContent = '0%';
+      if (counterEl) counterEl.textContent = '0%';
       tick();
+    }
+
+    function onAssetResolved() {
+      loadedCount++;
+      if (totalCount === 0) {
+        percent = 85;
+      } else {
+        percent = Math.round((loadedCount / totalCount) * 85);
+      }
+      if (gen === window._loadyGen) {
+        var val = Math.min(percent, 85);
+        window.dispatchEvent(new CustomEvent('pageLoady:progress', {
+          detail: { percent: val, raw: +(val / 100).toFixed(4), phase: phase },
+        }));
+      }
+      if (totalCount > 0 && (loadedCount / totalCount) >= threshold) {
+        removeLoader('Threshold');
+      }
+    }
+
+    function initAssetTracking() {
+      var assets = document.querySelectorAll('img, iframe, video[src], script[src]');
+      totalCount = assets.length;
+
+      if (totalCount === 0) {
+        percent = 85;
+        removeLoader('No Assets');
+        return;
+      }
+
+      for (var i = 0; i < assets.length; i++) {
+        (function (el) {
+          if (el.tagName === 'IMG' && el.complete) {
+            onAssetResolved();
+            return;
+          }
+          el.addEventListener('load', onAssetResolved);
+          el.addEventListener('error', onAssetResolved);
+        })(assets[i]);
+      }
     }
 
     function snapCounterTo100() {
