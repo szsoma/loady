@@ -1,151 +1,179 @@
-Building out Developer Experience (DX) and robust QA tools is exactly how you elevate a script from a simple utility to a premium, agency-grade asset. It saves hours of frustration during the QA phase and handles the edge cases that Webflow's dynamic nature often presents.
+# Loady Feature Specification
 
-Here is the technical specification and implementation guide for these new features.
+## `pageLoady:progress` Event
 
----
-
-### 1. Developer Experience (DX) & QA Tools
-
-These features are designed to give developers and testers control over the script's behavior without needing to alter the codebase or Webflow Designer settings temporarily.
-
-#### Feature 1.1: URL Parameter Bypass (`?noloader=true`)
-
-When Liam, Dan Foster, or any client is reviewing staging links, sitting through a loader repeatedly disrupts the testing flow. This feature completely aborts the loader logic if a specific query string is present.
-
-**Implementation Strategy:**
-Parse the URL string before doing anything else in the script. If the parameter exists, instantly remove the loader DOM element and reveal the GSAP elements.
-
-```javascript
-// 1. Check for bypass parameter
-const urlParams = new URLSearchParams(window.location.search);
-const bypassLoader = urlParams.get('noloader') === 'true';
-
-if (bypassLoader) {
-  // Instantly remove loader and show hidden elements
-  if (loader) loader.style.display = 'none';
-  document.body.removeAttribute('data-loader-status');
-  document.querySelectorAll('[data-gsap-hide]').forEach(el => {
-    el.style.visibility = 'inherit';
-    el.style.opacity = '1';
-  });
-  // Hand off to GSAP immediately
-  window.dispatchEvent(new CustomEvent('pageLoader:finished'));
-  return; // Stop the rest of the script from running
-}
-
-```
-
-#### Feature 1.2: Session Storage "Run Once" (`data-loader-once="true"`)
-
-Users navigating through the site shouldn't see the initial heavy loading sequence on every internal page click. Relying on `sessionStorage` ensures the loader only plays once per browser tab session.
-
-**Implementation Strategy:**
-Check for a specific key in `sessionStorage`. If it exists, execute the bypass logic. If it doesn't, play the loader and then set the key.
-
-```javascript
-const runOnce = loader.getAttribute('data-loader-once') === 'true';
-
-if (runOnce) {
-  const hasSeenLoader = sessionStorage.getItem('loaderSeen');
-  
-  if (hasSeenLoader) {
-    // Execute the same bypass logic as above
-    loader.style.display = 'none';
-    document.body.removeAttribute('data-loader-status');
-    // Ensure GSAP gets the signal immediately
-    window.dispatchEvent(new CustomEvent('pageLoader:finished'));
-    return;
-  } else {
-    // Set the flag for the next page load
-    sessionStorage.setItem('loaderSeen', 'true');
-  }
-}
-
-```
-
-#### Feature 1.3: Debug Mode Console Logger (`data-loader-debug="true"`)
-
-Console logs are great, but a messy console is useless. Debug mode should output a highly organized, styled table to the console so you can see exactly how the script is performing, how long the page took to load, and if the failsafe was triggered.
-
-**Implementation Strategy:**
-Use `console.groupCollapsed()` and `console.table()` to output performance metrics cleanly.
-
-```javascript
-const isDebug = loader.getAttribute('data-loader-debug') === 'true';
-const startTime = performance.now();
-
-const logDebugInfo = (triggerSource) => {
-  if (!isDebug) return;
-  const endTime = performance.now();
-  const timeTaken = ((endTime - startTime) / 1000).toFixed(2);
-  
-  console.groupCollapsed('%c🛠️ Loader Debug Info', 'background: #222; color: #bada55; padding: 4px; border-radius: 4px;');
-  console.table({
-    "Trigger Source": triggerSource, // 'Window Load' or 'Failsafe'
-    "Time Taken (s)": timeTaken,
-    "Animation Type": animType,
-    "Run Once Active": runOnce,
-    "Bypassed": bypassLoader
-  });
-  console.groupEnd();
-};
-
-// Call logDebugInfo('Window Load') or logDebugInfo('Failsafe') inside your removeLoader function.
-
-```
+### Overview
+A custom event dispatched on `window` during the asset loading phase, mirroring the internal progress state that already drives `data-loady-counter` and `data-loady-bar`. This decouples progress reporting from the built-in UI elements and lets developers drive any external renderer — Lottie, SVG path, canvas, Three.js, whatever.
 
 ---
 
-### 2. The MutationObserver for Webflow CMS
+### Event Shape
 
-**The Problem:** Webflow's native pagination, Finsweet's CMS Load (load more/infinite scroll), and third-party integrations inject new DOM nodes *after* your initial CSS has parsed and your script has run. If these new CMS items contain elements with `data-gsap-hide`, they might flash on the screen unstyled before GSAP can target them.
-
-**The Solution:** A `MutationObserver` watches the DOM in real-time. The microsecond a new node is injected, it checks if the node (or its children) has the `data-gsap-hide` attribute and aggressively applies the hidden state before the browser paints it to the screen.
-
-**Implementation Strategy:**
-Set up the observer to watch the `body` (or specific CMS list wrappers) for added nodes.
-
-```javascript
-// 1. Define the observer callback
-const hideInjectedElements = (mutationsList) => {
-  for (const mutation of mutationsList) {
-    // We only care about added nodes
-    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-      
-      mutation.addedNodes.forEach((node) => {
-        // Ensure it's an element node (ignores text nodes)
-        if (node.nodeType === 1) {
-          
-          // Check if the added node itself needs hiding
-          if (node.hasAttribute('data-gsap-hide')) {
-            node.style.visibility = 'hidden';
-            node.style.opacity = '0';
-          }
-          
-          // Check if any children inside the added node need hiding
-          const hiddenChildren = node.querySelectorAll('[data-gsap-hide]');
-          hiddenChildren.forEach(child => {
-            child.style.visibility = 'hidden';
-            child.style.opacity = '0';
-          });
-          
-        }
-      });
-    }
+```js
+window.dispatchEvent(new CustomEvent('pageLoady:progress', {
+  detail: {
+    percent: 72,        // integer 0–100
+    raw: 0.72,          // float 0.0–1.0
+    phase: 'loading',   // 'loading' | 'min-wait' | 'animating'
   }
-};
+}));
+```
 
-// 2. Initialize the Observer
-const observer = new MutationObserver(hideInjectedElements);
+**`percent`** — rounded integer, ready to display directly.
 
-// 3. Start observing the document body for injected elements
-observer.observe(document.body, {
-  childList: true, // Watch for added/removed nodes
-  subtree: true    // Watch all descendants, not just direct children
+**`raw`** — unrounded float for smooth interpolation (Lottie frame seek, SVG stroke-dashoffset, etc.).
+
+**`phase`** — tells listeners *why* progress is at a given value:
+- `loading` — assets still resolving
+- `min-wait` — assets done but `data-loady-min` hasn't elapsed yet; progress is being eased artificially toward 85%
+- `animating` — loader exit is playing; percent is 100, event fires once as a final signal
+
+---
+
+### Dispatch Frequency
+
+Fires on every internal tick — same cadence as the counter animation (~60fps via `requestAnimationFrame`). Consumers are responsible for their own throttling if needed.
+
+A final dispatch with `percent: 100` and `phase: 'animating'` fires at the moment the exit animation begins, before `pageLoady:finished`.
+
+---
+
+### Usage Examples
+
+**Lottie scrub**
+```js
+window.addEventListener('pageLoady:progress', ({ detail }) => {
+  lottieInstance.goToAndStop(detail.raw * totalFrames, true);
 });
+```
 
-// Note: You can leave this running, or call observer.disconnect() 
-// when the pageLoader:finished event fires, depending on whether 
-// you expect late CMS loads (like Finsweet 'Load More') on the page.
+**SVG circle stroke**
+```js
+const circle = document.querySelector('.progress-ring');
+const circumference = 2 * Math.PI * circle.r.baseVal.value;
 
+window.addEventListener('pageLoady:progress', ({ detail }) => {
+  circle.style.strokeDashoffset = circumference * (1 - detail.raw);
+});
+```
+
+**Vanilla counter (without `data-loady-counter`)**
+```js
+window.addEventListener('pageLoady:progress', ({ detail }) => {
+  document.querySelector('.my-counter').textContent = detail.percent + '%';
+});
+```
+
+---
+
+### Interaction with Built-in Attributes
+
+`pageLoady:progress` and `data-loady-counter` / `data-loady-bar` read from the **same internal progress value**. They are not mutually exclusive — you can use the event and the built-in counter simultaneously. The event just exposes what was previously private.
+
+---
+
+### Data Attribute API Addition
+
+| Attribute | Default | Description |
+|---|---|---|
+| *(no new attribute)* | — | Event is always dispatched. No opt-in required. |
+
+Rationale: the event is zero-cost to dispatch even if no listener exists. There's no reason to gate it behind an attribute.
+
+---
+---
+
+## `data-loady-threshold`
+
+### Overview
+
+By default Loady waits for **all** tracked assets to resolve before dismissing. On pages with many heavy resources, one slow image or non-critical script shouldn't hold the entire experience hostage. `data-loady-threshold` lets you define the fraction of assets that must complete before Loady considers the page "ready."
+
+---
+
+### Attribute
+
+```html
+<div
+  data-loady="container"
+  data-loady-threshold="0.9"
+>
+```
+
+**Type:** float string, `0.0`–`1.0`
+**Default:** `1.0` (all assets must resolve — existing behavior, fully backwards compatible)
+
+---
+
+### Behavior
+
+Loady tracks a set of "interesting" assets on the page (images, scripts, iframes — same as the current implementation). As each one resolves, the internal loaded count increments. The threshold check runs after each resolution:
+
+```
+loadedCount / totalCount >= threshold  →  trigger exit sequence
+```
+
+Once the threshold is crossed, the remaining unresolved assets are abandoned — Loady does not cancel them, they continue loading in the background normally. The loader just stops waiting.
+
+---
+
+### Edge Cases & Rules
+
+**`0.0` is valid but useless** — the loader would exit immediately on the first asset resolution. No validation error, just documented behavior.
+
+**`1.0` is the default** — explicit `data-loady-threshold="1.0"` is identical to omitting the attribute.
+
+**Interaction with `data-loady-min`** — threshold and minimum display time are independent axes. Even if the threshold is crossed immediately, `data-loady-min` is still respected. The exit sequence starts at `max(thresholdCrossedAt, minElapsedAt)`.
+
+**Interaction with `data-loady-failsafe`** — failsafe still applies. If the threshold is never crossed within the failsafe window (e.g. all assets fail to load), the failsafe forces dismissal as usual.
+
+**Zero assets** — if Loady finds no trackable assets on the page, it behaves as if the threshold is immediately satisfied (same as current behavior).
+
+**Threshold crossed at exactly 0% load (empty asset list)** — treated as immediate satisfaction, not as a division-by-zero edge case. `totalCount === 0` short-circuits the threshold check entirely.
+
+---
+
+### Progress Reporting Interaction
+
+When a threshold below `1.0` is set, the `pageLoady:progress` counter and `data-loady-counter` / `data-loady-bar` elements still animate to **100%** — not to the threshold percentage. The loader should always appear to complete fully from the user's perspective. The threshold is an internal trigger, not a visual ceiling.
+
+```
+Threshold 0.9 → 90% of assets load → internal: "ready"
+→ progress animates to 100% → exit animation plays
+```
+
+---
+
+### Suggested Use Cases
+
+| Scenario | Recommended threshold |
+|---|---|
+| Page with one known slow/non-critical asset | `0.9` |
+| Heavy image gallery, load-as-you-scroll content | `0.75`–`0.85` |
+| Aggressive: show page as soon as DOM-critical assets load | `0.5` |
+| Default: wait for everything | `1.0` (omit attribute) |
+
+---
+
+### Data Attribute API Addition
+
+| Attribute | Default | Description |
+|---|---|---|
+| `data-loady-threshold` | `1.0` | Fraction of tracked assets (0.0–1.0) that must resolve before the exit sequence begins. `1.0` = all assets (default behavior). |
+
+---
+
+## Event Ordering Summary
+
+For clarity, here's the full event sequence with both features active:
+
+```
+page starts loading
+  → pageLoady:progress fires at ~60fps  (phase: 'loading')
+  → threshold crossed (if < 1.0)
+  → data-loady-min wait (if set)
+  → pageLoady:progress fires once       (phase: 'animating', percent: 100)
+  → exit animation plays
+  → pageLoady:finished fires
+  → your GSAP / IX2 code runs
 ```
