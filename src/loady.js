@@ -40,6 +40,8 @@
     var loader = document.querySelector('[data-loady="container"]');
     if (!loader) return;
 
+    var cleanupRefs = {};
+
     var gen = (window._loadyGen = (window._loadyGen || 0) + 1);
 
     var skipGSAP = loader.getAttribute('data-loady-gsap') === 'false';
@@ -160,7 +162,7 @@
 
         void loader.offsetHeight;
 
-        loader.style.transition = 'all ' + duration + 's ' + easing;
+        loader.style.transition = buildTransition(duration, easing);
 
         switch (outboundAnim) {
           case 'slide-down':
@@ -258,6 +260,14 @@
     var phase = 'loading';
     var loadedCount = 0;
     var totalCount = 0;
+    var tickCancelled = false;
+
+    function dispatchProgress(pct, ph) {
+      if (gen !== window._loadyGen) return;
+      window.dispatchEvent(new CustomEvent('pageLoady:progress', {
+        detail: { percent: pct, raw: +(pct / 100).toFixed(4), phase: ph },
+      }));
+    }
 
     document.body.setAttribute('data-loady-status', 'loading');
     document.body.setAttribute('aria-busy', 'true');
@@ -291,6 +301,10 @@
       childList: true,
       subtree: true,
     });
+
+    function buildTransition(dur, ease) {
+      return 'opacity ' + dur + 's ' + ease + ', transform ' + dur + 's ' + ease;
+    }
 
     function logDebug(triggerSource) {
       if (!isDebug) return;
@@ -328,7 +342,7 @@
       percent = 100;
       snapCounterTo100();
 
-      loader.style.transition = 'all ' + duration + 's ' + easing;
+      loader.style.transition = buildTransition(duration, easing);
 
       switch (animType) {
         case 'slide-up':
@@ -349,18 +363,16 @@
       loader.style.display = 'none';
       document.body.removeAttribute('data-loady-status');
       document.body.removeAttribute('aria-busy');
+      if (observer) observer.disconnect();
+      if (cleanupRefs.pageshow) window.removeEventListener('pageshow', cleanupRefs.pageshow);
+      tickCancelled = true;
       if (gen === window._loadyGen) {
         window.dispatchEvent(new CustomEvent('pageLoady:finished'));
       }
     }
 
     function finish() {
-      if (gen === window._loadyGen) {
-        window.dispatchEvent(new CustomEvent('pageLoady:progress', {
-          detail: { percent: 100, raw: 1, phase: 'animating' },
-        }));
-      }
-      observer.disconnect();
+      dispatchProgress(100, 'animating');
       resumeGSAP();
       resumeIX2();
       cleanupLoader();
@@ -368,18 +380,14 @@
 
     function finishImmediately() {
       phase = 'animating';
-      if (gen === window._loadyGen) {
-        window.dispatchEvent(new CustomEvent('pageLoady:progress', {
-          detail: { percent: 100, raw: 1, phase: 'animating' },
-        }));
-      }
+      dispatchProgress(100, 'animating');
       resumeGSAP();
       resumeIX2();
       cleanupLoader();
     }
 
     function renderComplete() {
-      counterEl.textContent = '100%';
+      if (counterEl) counterEl.textContent = '100%';
       if (barEl) barEl.style.width = '100%';
     }
 
@@ -388,7 +396,7 @@
       var interval = 1000 / fps;
 
       function tick() {
-        if (counterDone) {
+        if (tickCancelled || counterDone) {
           renderComplete();
           return;
         }
@@ -404,16 +412,7 @@
         if (counterEl) counterEl.textContent = displayVal + '%';
         if (barEl) barEl.style.width = displayVal + '%';
 
-        if (gen === window._loadyGen) {
-          var progressVal = Math.min(percent, 85);
-          window.dispatchEvent(new CustomEvent('pageLoady:progress', {
-            detail: {
-              percent: progressVal,
-              raw: +(progressVal / 100).toFixed(4),
-              phase: phase,
-            },
-          }));
-        }
+        dispatchProgress(Math.min(percent, 85), phase);
 
         requestAnimationFrame(function () {
           setTimeout(tick, interval);
@@ -431,12 +430,7 @@
       } else {
         percent = Math.round((loadedCount / totalCount) * 85);
       }
-      if (gen === window._loadyGen) {
-        var val = Math.min(percent, 85);
-        window.dispatchEvent(new CustomEvent('pageLoady:progress', {
-          detail: { percent: val, raw: +(val / 100).toFixed(4), phase: phase },
-        }));
-      }
+      dispatchProgress(Math.min(percent, 85), phase);
       if (totalCount > 0 && (loadedCount / totalCount) >= threshold) {
         removeLoader('Threshold');
       }
@@ -479,14 +473,13 @@
       removeLoader('Failsafe');
     }, failsafeTime);
 
-    window.addEventListener('pageshow', function (event) {
+    cleanupRefs.pageshow = function (event) {
       if (event.persisted) {
-        loader.style.display = 'none';
-        document.body.style.overflow = '';
-        document.body.removeAttribute('data-loady-status');
-        document.body.removeAttribute('aria-busy');
-        window.dispatchEvent(new CustomEvent('pageLoady:finished'));
+        resumeGSAP();
+        resumeIX2();
+        cleanupLoader();
       }
-    });
+    };
+    window.addEventListener('pageshow', cleanupRefs.pageshow);
   });
 })();
