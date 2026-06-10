@@ -120,6 +120,7 @@
     }
 
     if (ignoreList || outboundAnim) {
+      var navigating = false;
       document.addEventListener('click', function (e) {
         if (ignoreList && e.target.closest(ignoreList)) {
           sessionStorage.setItem(IGNORE_KEY, '1');
@@ -131,7 +132,10 @@
 
         if (!outboundAnim || !isQualifyingLink(anchor)) return;
 
+        if (navigating) return;
+
         e.preventDefault();
+        navigating = true;
         var destinationUrl = anchor.href;
 
         var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

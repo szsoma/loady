@@ -1741,3 +1741,58 @@ describe('Duration clamp', function () {
     expect(document.body.getAttribute('data-loady-status')).toBe('loading');
   });
 });
+
+describe('navigating flag prevents double clicks', function () {
+  beforeEach(function () {
+    vi.useFakeTimers();
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '', href: 'http://localhost:3000/', origin: 'http://localhost:3000' },
+    });
+  });
+
+  afterEach(function () {
+    vi.runAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    Object.defineProperty(window, 'location', { writable: true });
+  });
+
+  it('ignores second click on same outbound link during animation', async function () {
+    var navigationCount = 0;
+    Object.defineProperty(window.location, 'href', {
+      configurable: true,
+      get: function () { return 'http://localhost:3000/'; },
+      set: function (val) {
+        if (val !== 'http://localhost:3000/') navigationCount++;
+      },
+    });
+
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.2"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    link.click();
+    link.click(); // double click
+
+    var loader = document.querySelector('[data-loady="container"]');
+    loader.dispatchEvent(new Event('transitionend'));
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(navigationCount).toBe(1);
+  });
+});
