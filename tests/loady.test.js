@@ -2053,3 +2053,37 @@ describe('Prefetch touch guard', function () {
     vi.useRealTimers();
   });
 });
+
+describe('try/catch guards', function () {
+  beforeEach(function () {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(function () {
+    vi.restoreAllMocks();
+  });
+
+  it('does not throw when querySelector simulates an error', async function () {
+    setupDOM('<div data-loady="container"><span data-loady-counter>0%</span></div>');
+
+    // Force an error in a guarded section by making querySelector throw on 3rd call
+    var origQS = document.querySelector;
+    var callCount = 0;
+    document.querySelector = function (sel) {
+      callCount++;
+      if (callCount === 3) throw new Error('Simulated error');
+      return origQS.call(document, sel);
+    };
+
+    await loadScript();
+
+    expect(function () {
+      fireDOMContentLoaded();
+    }).not.toThrow();
+
+    document.querySelector = origQS;
+  });
+});

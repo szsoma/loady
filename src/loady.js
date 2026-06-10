@@ -46,18 +46,19 @@
     var loader = document.querySelector('[data-loady="container"]');
     if (!loader) return;
 
+    try {
     var cleanupRefs = {};
 
     var gen = (window._loadyGen = (window._loadyGen || 0) + 1);
 
     var skipGSAP = loader.getAttribute('data-loady-gsap') === 'false';
-    if (!skipGSAP) pauseGSAP();
+    try { if (!skipGSAP) pauseGSAP(); } catch (e) {}
 
     var viewTransition = loader.getAttribute('data-loady-view-transition');
 
     var skipIX2 = loader.getAttribute('data-loady-ix2') === 'false';
     var forceIX2 = !!viewTransition;
-    if (!skipIX2 || forceIX2) pauseIX2();
+    try { if (!skipIX2 || forceIX2) pauseIX2(); } catch (e) {}
 
     var urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('noloader') === 'true') {
@@ -106,7 +107,11 @@
     var prefetchEnabled = loader.getAttribute('data-loady-prefetch') === 'true';
     var ignoreList = loader.getAttribute('data-loady-ignore');
 
-    var vtSupported = typeof document.startViewTransition === 'function';
+    try {
+      var vtSupported = typeof document.startViewTransition === 'function';
+    } catch (e) {
+      var vtSupported = false;
+    }
     var vtEnabled = viewTransition && vtSupported;
 
     function isQualifyingLink(anchor) {
@@ -513,5 +518,9 @@
       }
     };
     window.addEventListener('pageshow', cleanupRefs.pageshow);
+
+    } catch (e) {
+      console.error('[Loady] Initialization failed:', e);
+    }
   });
 })();
