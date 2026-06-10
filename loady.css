@@ -1,6 +1,7 @@
 /* Loady — CDN Page Loader
  * Paste this snippet into the <head> of your page.
- * https://github.com/anomalyco/loady
+ * https://github.com/szsoma/loady
+ * made by Soma Szoboszlai
  */
 
 /* 1. Instantly hide elements meant for GSAP/JS animations */
@@ -24,21 +25,35 @@ body[data-loady-status="loading"] {
 
 /* 4. View Transition keyframes (active only during startViewTransition) */
 ::view-transition-old(root) {
-  animation: loady-vt-old var(--loady-duration, 0.5s) var(--loady-easing, ease-in-out) forwards;
+  animation: loady-vt-old var(--loady-duration, 0.5s)
+    var(--loady-easing, ease-in-out) forwards;
 }
 
 ::view-transition-new(root) {
-  animation: loady-vt-new var(--loady-duration, 0.5s) var(--loady-easing, ease-in-out) forwards;
+  animation: loady-vt-new var(--loady-duration, 0.5s)
+    var(--loady-easing, ease-in-out) forwards;
 }
 
 @keyframes loady-vt-old {
-  from { opacity: 1; translate: 0 0; }
-  to   { opacity: 0; translate: 0 -40px; }
+  from {
+    opacity: 1;
+    translate: 0 0;
+  }
+  to {
+    opacity: 0;
+    translate: 0 -40px;
+  }
 }
 
 @keyframes loady-vt-new {
-  from { opacity: 0; translate: 0 40px; }
-  to   { opacity: 1; translate: 0 0; }
+  from {
+    opacity: 0;
+    translate: 0 40px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
 }
 
 /* 5. Reduced motion — suppress all loader and view transition animations */

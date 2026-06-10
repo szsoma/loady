@@ -183,6 +183,22 @@ All configuration is done via `data-*` attributes on the loader container. No Ja
 ```html
 <div data-loady="container" data-loady-failsafe="3000" data-loady-min="800" data-loady-threshold="0.8">
 ```
+**How data-loady-min and data-loady-threshold work together**
+
+1. Threshold (data-loady-threshold): Controls WHEN the loader starts its exit.
+
+2. Min (data-loady-min): Controls how long the loader must stay visible.
+
+So they work in sequence:
+1. Threshold triggers removeLoader (the "decision to exit")
+2. Min-time determines when animateOut actually starts (the "timing of exit")
+
+For example, with threshold=0.5 and min=2000, if half the assets load in 500ms, the loader waits the remaining 1500ms before animating out. The counter holds at 85% during that wait, then transitions to 100% over the exit duration.
+
+The threshold acts as the gate—it decides when exit can begin—while min-time acts as the floor, ensuring the loader stays visible for at least that long regardless of how quickly assets load.
+They don't override each other — they work in sequence:
+Threshold = when to start the exit decision
+Min = how long the loader must stay visible
 
 ### Progress Tracking
 

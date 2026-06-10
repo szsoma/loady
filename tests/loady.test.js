@@ -276,6 +276,82 @@ describe('MutationObserver for injected elements', () => {
   });
 });
 
+describe('Auto-reveal of data-gsap-hide elements', function () {
+  beforeEach(function () {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(function () {
+    vi.restoreAllMocks();
+  });
+
+  it('reveals static data-gsap-hide elements when loader finishes', async function () {
+    setupDOM(`
+      <div data-loady="container" data-loady-duration="0.1" data-loady-failsafe="5000">
+        <span data-loady-counter>0%</span>
+      </div>
+      <div data-gsap-hide id="static-hidden">Hidden content</div>
+    `);
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(function (r) { return setTimeout(r, 300); });
+
+    var el = document.getElementById('static-hidden');
+    expect(el.style.visibility).toBe('visible');
+    expect(el.style.opacity).toBe('1');
+  });
+
+  it('reveals dynamically injected data-gsap-hide elements when loader finishes', async function () {
+    setupDOM('<div data-loady="container" data-loady-duration="0.1" data-loady-failsafe="5000"><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var injected = document.createElement('div');
+    injected.setAttribute('data-gsap-hide', '');
+    injected.id = 'dynamic-hidden';
+    document.body.appendChild(injected);
+
+    await new Promise(function (r) { return setTimeout(r, 50); });
+
+    fireLoad();
+
+    await new Promise(function (r) { return setTimeout(r, 300); });
+
+    var el = document.getElementById('dynamic-hidden');
+    expect(el.style.visibility).toBe('visible');
+    expect(el.style.opacity).toBe('1');
+  });
+
+  it('maintains reveal after bfcache restore', async function () {
+    setupDOM('<div data-loady="container" data-loady-duration="0.1" data-loady-failsafe="5000"><span data-loady-counter>0%</span></div>');
+    var gsapEl = document.createElement('div');
+    gsapEl.setAttribute('data-gsap-hide', '');
+    gsapEl.id = 'bfcache-el';
+    document.body.appendChild(gsapEl);
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(function (r) { return setTimeout(r, 300); });
+
+    var pageshowEvent = new Event('pageshow');
+    Object.defineProperty(pageshowEvent, 'persisted', { value: true });
+    window.dispatchEvent(pageshowEvent);
+
+    var el = document.getElementById('bfcache-el');
+    expect(el.style.visibility).toBe('visible');
+    expect(el.style.opacity).toBe('1');
+  });
+});
+
 describe('GSAP auto-pause', () => {
   var mockGSAP;
 
