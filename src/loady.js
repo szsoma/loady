@@ -148,31 +148,13 @@
         loader.style.opacity = '';
         loader.style.transform = '';
 
-        switch (outboundAnim) {
-          case 'slide-down':
-            loader.style.transform = 'translateY(-100%)';
-            break;
-          case 'slide-up':
-            loader.style.transform = 'translateY(100%)';
-            break;
-          case 'fade':
-          default:
-            loader.style.opacity = '0';
-        }
+        setAnimState(loader, outboundAnim, 'initial');
 
         void loader.offsetHeight;
 
         loader.style.transition = buildTransition(duration, easing);
 
-        switch (outboundAnim) {
-          case 'slide-down':
-          case 'slide-up':
-            loader.style.transform = 'translateY(0)';
-            break;
-          case 'fade':
-          default:
-            loader.style.opacity = '1';
-        }
+        setAnimState(loader, outboundAnim, 'final');
 
         function doNavigate() {
           if (vtEnabled && viewTransition === 'persistent') {
@@ -306,6 +288,24 @@
       return 'opacity ' + dur + 's ' + ease + ', transform ' + dur + 's ' + ease;
     }
 
+    function setAnimState(el, anim, phase) {
+      var isSlide = anim === 'slide-up' || anim === 'slide-down';
+      if (phase === 'initial') {
+        if (isSlide) {
+          var dir = anim === 'slide-down' ? '-100%' : '100%';
+          el.style.transform = 'translateY(' + dir + ')';
+        } else {
+          el.style.opacity = '0';
+        }
+      } else {
+        if (isSlide) {
+          el.style.transform = 'translateY(0)';
+        } else {
+          el.style.opacity = '1';
+        }
+      }
+    }
+
     function logDebug(triggerSource) {
       if (!isDebug) return;
       var timeTaken = ((performance.now() - perfStart) / 1000).toFixed(2);
@@ -344,17 +344,7 @@
 
       loader.style.transition = buildTransition(duration, easing);
 
-      switch (animType) {
-        case 'slide-up':
-          loader.style.transform = 'translateY(-100%)';
-          break;
-        case 'slide-down':
-          loader.style.transform = 'translateY(100%)';
-          break;
-        case 'fade':
-        default:
-          loader.style.opacity = '0';
-      }
+      setAnimState(loader, animType, 'initial');
 
       setTimeout(completeLoader, duration * 1000);
     }
