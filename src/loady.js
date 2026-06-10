@@ -85,7 +85,6 @@
     var threshold = (isNaN(thresholdVal) || thresholdVal <= 0 || thresholdVal > 1) ? 1 : thresholdVal;
 
     var outboundAnim = loader.getAttribute('data-loady-outbound');
-    var prefetchEnabled = loader.getAttribute('data-loady-prefetch') === 'true';
     var ignoreList = loader.getAttribute('data-loady-ignore');
 
     function isQualifyingLink(anchor) {
@@ -328,7 +327,6 @@
       renderComplete();
     }
 
-    var ignoreList = loader.getAttribute('data-loady-ignore');
     if (ignoreList) {
       document.addEventListener('click', function (e) {
         var target = e.target.closest(ignoreList);
