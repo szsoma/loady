@@ -844,6 +844,42 @@ describe('isQualifyingLink (via outbound click)', () => {
     expect(prevented).toBe(false);
   });
 
+  it('sets sessionStorage for ignored links', async () => {
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-ignore=".skip" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.className = 'skip';
+    link.textContent = 'Skip';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(event);
+
+    expect(sessionStorage.getItem('loady:ignore')).toBe('1');
+  });
+
+  it('works with ignoreList without outbound configured', async () => {
+    setupDOM('<div data-loady="container" data-loady-ignore=".skip" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.className = 'skip';
+    link.textContent = 'Skip';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    link.dispatchEvent(event);
+
+    expect(sessionStorage.getItem('loady:ignore')).toBe('1');
+  });
+
   it('does not intercept when outbound is not configured', async () => {
     setupDOM('<div data-loady="container" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
 

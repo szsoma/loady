@@ -105,13 +105,13 @@
 
     if (ignoreList || outboundAnim) {
       document.addEventListener('click', function (e) {
-        var anchor = e.target.closest('a');
-        if (!anchor) return;
-
-        if (ignoreList && anchor.matches(ignoreList)) {
+        if (ignoreList && e.target.closest(ignoreList)) {
           sessionStorage.setItem(IGNORE_KEY, '1');
           return;
         }
+
+        var anchor = e.target.closest('a');
+        if (!anchor) return;
 
         if (!outboundAnim || !isQualifyingLink(anchor)) return;
 
