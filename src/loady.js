@@ -1,6 +1,12 @@
 (function () {
   'use strict';
 
+  var L = window.__loadyDebug ? console : { log: function () {}, warn: function () {}, error: function () {} };
+
+  function log(msg) { L.log('%c[Loady]%c ' + msg, 'color:#bada55;font-weight:bold', 'color:inherit'); }
+  function warn(msg) { L.warn('[Loady] ' + msg); }
+  function err(msg) { L.error('[Loady] ' + msg); }
+
   var IGNORE_KEY = 'loady:ignore';
   var SEEN_KEY = 'loady:seen';
 
