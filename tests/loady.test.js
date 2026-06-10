@@ -1696,3 +1696,48 @@ describe('Counter animation', () => {
     vi.useRealTimers();
   });
 });
+
+describe('Duration clamp', function () {
+  beforeEach(function () {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(function () {
+    vi.restoreAllMocks();
+  });
+
+  it('handles duration=0 as instant hide without transition', async function () {
+    setupDOM('<div data-loady="container" data-loady-duration="0"><span data-loady-counter>0%</span></div>');
+
+    var finished = false;
+    window.addEventListener('pageLoady:finished', function () { finished = true; });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var loader = document.querySelector('[data-loady="container"]');
+    expect(loader.style.display).toBe('none');
+    expect(finished).toBe(true);
+  });
+
+  it('clamps negative duration to 0.1 minimum', async function () {
+    setupDOM('<div data-loady="container" data-loady-duration="-1"><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    expect(document.body.getAttribute('data-loady-status')).toBe('loading');
+  });
+
+  it('clamps sub-0.1 duration to 0.1', async function () {
+    setupDOM('<div data-loady="container" data-loady-duration="0.05"><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    expect(document.body.getAttribute('data-loady-status')).toBe('loading');
+  });
+});

@@ -76,9 +76,16 @@
       return;
     }
 
-    var animType = loader.getAttribute('data-loady-anim') || 'fade';
     var durationVal = parseFloat(loader.getAttribute('data-loady-duration'));
     var duration = isNaN(durationVal) ? 0.5 : durationVal;
+    if (duration < 0.1 && duration !== 0) duration = 0.1;
+
+    if (duration === 0) {
+      completeLoader();
+      return;
+    }
+
+    var animType = loader.getAttribute('data-loady-anim') || 'fade';
     var failsafeVal = parseInt(loader.getAttribute('data-loady-failsafe'), 10);
     var failsafeTime = isNaN(failsafeVal) ? 5000 : failsafeVal;
     var minVal = parseInt(loader.getAttribute('data-loady-min'), 10);
