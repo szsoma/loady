@@ -57,13 +57,13 @@
     if (urlParams.get('noloader') === 'true') {
       sessionStorage.removeItem(SEEN_KEY);
       sessionStorage.removeItem(IGNORE_KEY);
-      finishImmediately();
+      completeLoader();
       return;
     }
 
     var runOnce = loader.getAttribute('data-loady-once') === 'true';
     if (runOnce && sessionStorage.getItem(SEEN_KEY) === 'true') {
-      finishImmediately();
+      completeLoader();
       return;
     }
     if (runOnce) {
@@ -72,7 +72,7 @@
 
     if (sessionStorage.getItem(IGNORE_KEY) === '1') {
       sessionStorage.removeItem(IGNORE_KEY);
-      finishImmediately();
+      completeLoader();
       return;
     }
 
@@ -356,7 +356,7 @@
           loader.style.opacity = '0';
       }
 
-      setTimeout(finish, duration * 1000);
+      setTimeout(completeLoader, duration * 1000);
     }
 
     function cleanupLoader() {
@@ -371,14 +371,7 @@
       }
     }
 
-    function finish() {
-      dispatchProgress(100, 'animating');
-      resumeGSAP();
-      resumeIX2();
-      cleanupLoader();
-    }
-
-    function finishImmediately() {
+    function completeLoader() {
       phase = 'animating';
       dispatchProgress(100, 'animating');
       resumeGSAP();
