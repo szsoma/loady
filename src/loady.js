@@ -371,8 +371,6 @@
       var perfStart = performance.now();
       var isLoaded = false;
       var counterDone = false;
-      var counterEl = domCache.counter;
-      var barEl = domCache.bar;
 
       if (vtEnabled) {
         domCache.loader.style.setProperty("--loady-duration", duration + "s");
@@ -515,7 +513,7 @@
       function animateOut() {
         phase = "animating";
         percent = 100;
-        if (!counterEl && !barEl) {
+        if (!domCache.counter && !domCache.bar) {
           counterDone = true;
         }
 
@@ -561,8 +559,8 @@
       }
 
       function renderComplete() {
-        if (counterEl) counterEl.textContent = "100%";
-        if (barEl) barEl.style.width = "100%";
+        if (domCache.counter) domCache.counter.textContent = "100%";
+        if (domCache.bar) domCache.bar.style.width = "100%";
       }
 
       function startProgress() {
@@ -589,8 +587,8 @@
 
           var displayVal = Math.round(Math.min(displayedPercent, 100));
 
-          if (counterEl) counterEl.textContent = displayVal + "%";
-          if (barEl) barEl.style.width = displayVal + "%";
+          if (domCache.counter) domCache.counter.textContent = displayVal + "%";
+          if (domCache.bar) domCache.bar.style.width = displayVal + "%";
 
           if (phase !== "animating") {
             dispatchProgress(Math.min(percent, 85), phase);
@@ -601,7 +599,7 @@
           });
         }
 
-        if (counterEl) counterEl.textContent = "0%";
+        if (domCache.counter) domCache.counter.textContent = "0%";
         tick();
       }
 
