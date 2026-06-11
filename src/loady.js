@@ -4,7 +4,14 @@
 
   var L = window.__loadyDebug
     ? console
-    : { log: function () {}, warn: function () {}, error: function () {} };
+    : {
+        log: function () {},
+        warn: function () {},
+        error: function () {},
+        groupCollapsed: function () {},
+        groupEnd: function () {},
+        table: function () {}
+      };
 
   function log(msg) {
     L.log(
@@ -157,7 +164,6 @@
       var failsafeTime = isNaN(failsafeVal) ? 5000 : failsafeVal;
       var minVal = parseInt(domCache.loader.getAttribute("data-loady-min"), 10);
       var minTime = isNaN(minVal) ? 0 : minVal;
-      var isDebug = domCache.loader.getAttribute("data-loady-debug") === "true";
       var easing = domCache.loader.getAttribute("data-loady-easing") || "ease-in-out";
 
       var thresholdVal = parseFloat(
@@ -298,7 +304,6 @@
           link.setAttribute("as", "document");
           document.head.appendChild(link);
           log("Prefetched: " + url);
-          if (isDebug) console.log(link);
         }
 
         document.addEventListener(
@@ -443,13 +448,12 @@
 
 
       function logDebug(triggerSource) {
-        if (!isDebug) return;
         var timeTaken = ((performance.now() - perfStart) / 1000).toFixed(2);
-        console.groupCollapsed(
+        L.groupCollapsed(
           "%c Loady Debug",
           "background: #222; color: #bada55; padding: 4px; border-radius: 4px;",
         );
-        console.table({
+        L.table({
           "Trigger Source": triggerSource,
           "Time Taken (s)": timeTaken,
           "Animation Type": animType,
@@ -467,7 +471,7 @@
           "GSAP Paused": !skipGSAP && !!gsapTL,
           "IX2 Paused": !skipIX2 && !!ix2Engine,
         });
-        console.groupEnd();
+        L.groupEnd();
       }
 
       function removeLoader(triggerSource) {

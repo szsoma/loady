@@ -179,9 +179,11 @@ describe('Debug mode (data-loady-debug)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    delete window.__loadyDebug;
   });
 
   it('logs debug info to console when data-loady-debug="true"', async () => {
+    window.__loadyDebug = true;
     setupDOM('<div data-loady="container" data-loady-debug="true" data-loady-anim="slide-up"><span data-loady-counter>0%</span></div>');
 
     var groupSpy = vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
@@ -216,6 +218,39 @@ describe('Debug mode (data-loady-debug)', () => {
 
     expect(groupSpy).not.toHaveBeenCalled();
     expect(tableSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('Debug logger no-op completeness', function () {
+  beforeEach(function () {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+    delete window.__loadyDebug;
+  });
+
+  afterEach(function () {
+    vi.restoreAllMocks();
+    delete window.__loadyDebug;
+  });
+
+  it('no-op logger has groupCollapsed, table, and groupEnd methods', async function () {
+    setupDOM('<div data-loady="container" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var groupSpy = vi.spyOn(console, 'groupCollapsed').mockImplementation(function () {});
+    var tableSpy = vi.spyOn(console, 'table').mockImplementation(function () {});
+    var groupEndSpy = vi.spyOn(console, 'groupEnd').mockImplementation(function () {});
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(function (r) { return setTimeout(r, 300); });
+
+    expect(groupSpy).not.toHaveBeenCalled();
+    expect(tableSpy).not.toHaveBeenCalled();
+    expect(groupEndSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -529,9 +564,11 @@ describe('Debug mode includes GSAP/IX2 status', () => {
     vi.restoreAllMocks();
     delete window.gsap;
     delete window.Webflow;
+    delete window.__loadyDebug;
   });
 
   it('shows GSAP and IX2 status in debug table', async () => {
+    window.__loadyDebug = true;
     window.gsap = { globalTimeline: { pause: vi.fn(), resume: vi.fn() } };
     window.Webflow = { require: vi.fn(() => ({ destroy: vi.fn(), init: vi.fn() })) };
 
@@ -553,6 +590,7 @@ describe('Debug mode includes GSAP/IX2 status', () => {
   });
 
   it('shows false when GSAP/IX2 are opted out', async () => {
+    window.__loadyDebug = true;
     window.gsap = { globalTimeline: { pause: vi.fn(), resume: vi.fn() } };
     window.Webflow = { require: vi.fn(() => ({ destroy: vi.fn(), init: vi.fn() })) };
 
