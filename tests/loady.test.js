@@ -2283,3 +2283,68 @@ describe('Progress update throttling', function () {
     expect(counterEl.textContent).toBe('100%');
   });
 });
+
+describe('CSS custom property animations', function () {
+  beforeEach(function () {
+    vi.useFakeTimers();
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '', href: 'http://localhost:3000/', origin: 'http://localhost:3000' },
+    });
+  });
+
+  afterEach(function () {
+    vi.runAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    Object.defineProperty(window, 'location', { writable: true });
+  });
+
+  it('sets data-loady-state attribute on container for animateOut', async function () {
+    setupDOM('<div data-loady="container" data-loady-anim="slide-up" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    var loader = document.querySelector('[data-loady="container"]');
+    expect(loader.getAttribute('data-loady-state')).toBe('slide-up');
+  });
+
+  it('sets data-loady-state attribute for outbound animation', async function () {
+    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    link.click();
+
+    var loader = document.querySelector('[data-loady="container"]');
+    expect(loader.getAttribute('data-loady-state')).toBe('outbound-fade-final');
+  });
+
+  it('CSS transition is driven by custom properties', async function () {
+    setupDOM('<div data-loady="container" data-loady-duration="0.3" data-loady-easing="ease-out"><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var loader = document.querySelector('[data-loady="container"]');
+    expect(loader.style.getPropertyValue('--loady-duration')).toBe('0.3s');
+    expect(loader.style.getPropertyValue('--loady-easing')).toBe('ease-out');
+  });
+});

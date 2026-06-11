@@ -237,16 +237,16 @@
 
           domCache.loader.style.transition = "none";
           domCache.loader.style.display = "flex";
+          domCache.loader.removeAttribute("data-loady-state");
           domCache.loader.style.opacity = "";
           domCache.loader.style.transform = "";
 
-          setAnimState(domCache.loader, outboundAnim, "initial", "outbound");
+          domCache.loader.setAttribute("data-loady-state", "outbound-" + outboundAnim);
 
           void domCache.loader.offsetHeight;
 
-          domCache.loader.style.transition = buildTransition(duration, easing);
-
-          setAnimState(domCache.loader, outboundAnim, "final", "outbound");
+          domCache.loader.style.transition = "";
+          domCache.loader.setAttribute("data-loady-state", "outbound-" + outboundAnim + "-final");
 
           function doNavigate() {
             isNavigating = false;
@@ -372,13 +372,11 @@
       var isLoaded = false;
       var counterDone = false;
 
-      if (vtEnabled) {
-        domCache.loader.style.setProperty("--loady-duration", duration + "s");
-        domCache.loader.style.setProperty("--loady-easing", easing);
-        if (viewTransition === "persistent") {
-          domCache.loader.style.viewTransitionName = "loady-container";
-          domCache.loader.style.contain = "layout";
-        }
+      domCache.loader.style.setProperty("--loady-duration", duration + "s");
+      domCache.loader.style.setProperty("--loady-easing", easing);
+      if (vtEnabled && viewTransition === "persistent") {
+        domCache.loader.style.viewTransitionName = "loady-container";
+        domCache.loader.style.contain = "layout";
       }
 
       if (viewTransition) {
@@ -442,33 +440,7 @@
         subtree: true,
       });
 
-      function buildTransition(dur, ease) {
-        return (
-          "opacity " + dur + "s " + ease + ", transform " + dur + "s " + ease
-        );
-      }
 
-      function setAnimState(el, anim, phase, context) {
-        var isSlide = anim === "slide-up" || anim === "slide-down";
-        if (!isSlide) {
-          el.style.opacity = phase === "initial" ? "0" : "1";
-          return;
-        }
-        if (phase === "final") {
-          el.style.transform = "translateY(0)";
-          return;
-        }
-        // phase === 'initial'
-        if (context === "outbound") {
-          // Outbound: slide-down starts above, slide-up starts below
-          var dir = anim === "slide-down" ? "-100%" : "100%";
-          el.style.transform = "translateY(" + dir + ")";
-        } else {
-          // animateOut: slide-up goes up, slide-down goes down
-          var dir = anim === "slide-up" ? "-100%" : "100%";
-          el.style.transform = "translateY(" + dir + ")";
-        }
-      }
 
       function logDebug(triggerSource) {
         if (!isDebug) return;
@@ -517,9 +489,8 @@
           counterDone = true;
         }
 
-        domCache.loader.style.transition = buildTransition(duration, easing);
-
-        setAnimState(domCache.loader, animType, "initial", "animateOut");
+        domCache.loader.style.transition = "";
+        domCache.loader.setAttribute("data-loady-state", animType);
 
         setTimeout(function () {
           if (!counterDone) {

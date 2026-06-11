@@ -23,7 +23,46 @@ body[data-loady-status="loading"] {
   display: flex;
 }
 
-/* 4. View Transition keyframes (active only during startViewTransition) */
+/* 4. Animation transitions driven by CSS custom properties */
+[data-loady="container"] {
+  transition: opacity var(--loady-duration, 0.5s) var(--loady-easing, ease-in-out),
+              transform var(--loady-duration, 0.5s) var(--loady-easing, ease-in-out);
+}
+
+/* animateOut states */
+[data-loady="container"][data-loady-state="fade"] {
+  opacity: 0;
+}
+[data-loady="container"][data-loady-state="slide-up"] {
+  transform: translateY(-100%);
+}
+[data-loady="container"][data-loady-state="slide-down"] {
+  transform: translateY(100%);
+}
+
+/* Outbound initial states */
+[data-loady="container"][data-loady-state="outbound-fade"] {
+  opacity: 0;
+}
+[data-loady="container"][data-loady-state="outbound-slide-up"] {
+  transform: translateY(100%);
+}
+[data-loady="container"][data-loady-state="outbound-slide-down"] {
+  transform: translateY(-100%);
+}
+
+/* Outbound final states */
+[data-loady="container"][data-loady-state="outbound-fade-final"] {
+  opacity: 1;
+}
+[data-loady="container"][data-loady-state="outbound-slide-up-final"] {
+  transform: translateY(0);
+}
+[data-loady="container"][data-loady-state="outbound-slide-down-final"] {
+  transform: translateY(0);
+}
+
+/* 5. View Transition keyframes (active only during startViewTransition) */
 ::view-transition-old(root) {
   animation: loady-vt-old var(--loady-duration, 0.5s)
     var(--loady-easing, ease-in-out) forwards;
@@ -56,7 +95,7 @@ body[data-loady-status="loading"] {
   }
 }
 
-/* 5. Reduced motion — suppress all loader and view transition animations */
+/* 6. Reduced motion — suppress all loader and view transition animations */
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(root),
   ::view-transition-new(root) {
