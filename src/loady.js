@@ -25,6 +25,7 @@
 
   var isNavigating = false;
   var prefetchTimers = new WeakMap();
+  var observer = null;
 
   var gsapTL = null;
 
@@ -276,7 +277,7 @@
           );
         }, function () {
           isNavigating = false;
-        });
+        }));
       }
 
       if (prefetchEnabled) {
@@ -325,7 +326,7 @@
             },
             { once: true },
           );
-        }, null);
+        }, null));
 
         document.addEventListener(
           "touchstart",
@@ -420,7 +421,7 @@
         img.addEventListener("error", onAssetResolved, { once: true });
       }
 
-      var observer = new MutationObserver(function (mutationsList) {
+      observer = new MutationObserver(function (mutationsList) {
         mutationsList.forEach(function (mutation) {
           mutation.addedNodes.forEach(function (node) {
             if (node.nodeType !== 1) return;

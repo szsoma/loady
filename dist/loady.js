@@ -15,9 +15,16 @@
         "color:inherit",
       );
     }
+    function err(msg) {
+      L.error("[Loady] " + msg);
+    }
 
     var IGNORE_KEY = "loady:ignore";
     var SEEN_KEY = "loady:seen";
+
+    var isNavigating = false;
+    var prefetchTimers = new WeakMap();
+    var observer = null;
 
     var gsapTL = null;
 
@@ -51,6 +58,24 @@
       }
     }
 
+    function cleanupAllObservers() {
+      if (observer) {
+        observer.disconnect();
+        observer = null;
+      }
+    }
+
+    function safeWrap(fn, fallback) {
+      return function () {
+        try {
+          return fn.apply(this, arguments);
+        } catch (e) {
+          err("Handler error: " + e.message);
+          if (fallback) fallback.apply(this, arguments);
+        }
+      };
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
       var loader = document.querySelector('[data-loady="container"]');
       if (!loader) return;
@@ -77,12 +102,18 @@
         if (urlParams.get("noloader") === "true") {
           sessionStorage.removeItem(SEEN_KEY);
           sessionStorage.removeItem(IGNORE_KEY);
+          resumeGSAP();
+          resumeIX2();
+          cleanupAllObservers();
           completeLoader("noloader");
           return;
         }
 
         var runOnce = loader.getAttribute("data-loady-once") === "true";
         if (runOnce && sessionStorage.getItem(SEEN_KEY) === "true") {
+          resumeGSAP();
+          resumeIX2();
+          cleanupAllObservers();
           completeLoader("normal");
           return;
         }
@@ -92,6 +123,9 @@
 
         if (sessionStorage.getItem(IGNORE_KEY) === "1") {
           sessionStorage.removeItem(IGNORE_KEY);
+          resumeGSAP();
+          resumeIX2();
+          cleanupAllObservers();
           completeLoader("normal");
           return;
         }
@@ -101,6 +135,9 @@
         if (duration < 0.1 && duration !== 0) duration = 0.1;
 
         if (duration === 0) {
+          resumeGSAP();
+          resumeIX2();
+          cleanupAllObservers();
           completeLoader("normal");
           return;
         }
@@ -153,28 +190,30 @@
         }
 
         if (ignoreList || outboundAnim) {
-          var navigating = false;
-          document.addEventListener("click", function (e) {
-            if (ignoreList && e.target.closest(ignoreList)) {
-              sessionStorage.setItem(IGNORE_KEY, "1");
-              return;
-            }
+          document.addEventListener(
+            "click",
+            safeWrap(function (e) {
+              if (ignoreList && e.target.closest(ignoreList)) {
+                sessionStorage.setItem(IGNORE_KEY, "1");
+                return;
+              }
 
-            var anchor = e.target.closest("a");
-            if (!anchor) return;
+              var anchor = e.target.closest("a");
+              if (!anchor) return;
 
-            if (!outboundAnim || !isQualifyingLink(anchor)) return;
+              if (!outboundAnim || !isQualifyingLink(anchor)) return;
 
-            if (navigating) return;
+              if (isNavigating) return;
 
             e.preventDefault();
-            navigating = true;
+            isNavigating = true;
             var destinationUrl = anchor.href;
 
             var prefersReducedMotion =
               window.matchMedia &&
               window.matchMedia("(prefers-reduced-motion: reduce)").matches;
             if (prefersReducedMotion) {
+              isNavigating = false;
               window.location.href = destinationUrl;
               return;
             }
@@ -203,6 +242,7 @@
             setAnimState(loader, outboundAnim, "final", "outbound");
 
             function doNavigate() {
+              isNavigating = false;
               if (vtEnabled && viewTransition === "persistent") {
                 document.startViewTransition(function () {
                   window.location.href = destinationUrl;
@@ -234,7 +274,9 @@
               },
               { once: true },
             );
-          });
+          }, function () {
+            isNavigating = false;
+          }));
         }
 
         if (prefetchEnabled) {
@@ -252,9 +294,11 @@
             if (isDebug) console.log(link);
           }
 
-          document.addEventListener("mouseover", function (e) {
-            var anchor = e.target.closest("a");
-            if (!anchor || !isQualifyingLink(anchor)) return;
+          document.addEventListener(
+            "mouseover",
+            safeWrap(function (e) {
+              var anchor = e.target.closest("a");
+              if (!anchor || !isQualifyingLink(anchor)) return;
 
             var connection = navigator.connection;
             if (connection) {
@@ -268,43 +312,52 @@
 
             var timer = setTimeout(function () {
               prefetch(anchor.href);
+              prefetchTimers.delete(anchor);
             }, 80);
+
+            prefetchTimers.set(anchor, timer);
 
             anchor.addEventListener(
               "mouseleave",
               function () {
-                clearTimeout(timer);
+                clearTimeout(prefetchTimers.get(anchor));
+                prefetchTimers.delete(anchor);
               },
               { once: true },
             );
-          });
+          }, null));
 
-          document.addEventListener("touchstart", function (e) {
-            var anchor = e.target.closest("a");
-            if (!anchor || !isQualifyingLink(anchor)) return;
+          document.addEventListener(
+            "touchstart",
+            safeWrap(function (e) {
+              var anchor = e.target.closest("a");
+              if (!anchor || !isQualifyingLink(anchor)) return;
 
-            var connection = navigator.connection;
-            if (connection) {
-              if (connection.saveData) return;
-              if (
-                connection.effectiveType === "slow-2g" ||
-                connection.effectiveType === "2g"
-              )
-                return;
-            }
+              var connection = navigator.connection;
+              if (connection) {
+                if (connection.saveData) return;
+                if (
+                  connection.effectiveType === "slow-2g" ||
+                  connection.effectiveType === "2g"
+                )
+                  return;
+              }
 
-            var timer = setTimeout(function () {
-              prefetch(anchor.href);
-            }, 80);
+              var timer = setTimeout(function () {
+                prefetch(anchor.href);
+                prefetchTimers.delete(anchor);
+              }, 80);
 
-            var onEnd = function () {
-              clearTimeout(timer);
-              anchor.removeEventListener("touchend", onEnd);
-              anchor.removeEventListener("touchcancel", onEnd);
-            };
-            anchor.addEventListener("touchend", onEnd, { once: true });
-            anchor.addEventListener("touchcancel", onEnd, { once: true });
-          });
+              prefetchTimers.set(anchor, timer);
+
+              var onEnd = function () {
+                clearTimeout(prefetchTimers.get(anchor));
+                prefetchTimers.delete(anchor);
+              };
+              anchor.addEventListener("touchend", onEnd, { once: true });
+              anchor.addEventListener("touchcancel", onEnd, { once: true });
+            }, null),
+          );
         }
 
         var startTime = Date.now();
@@ -367,7 +420,7 @@
           img.addEventListener("error", onAssetResolved, { once: true });
         }
 
-        var observer = new MutationObserver(function (mutationsList) {
+        observer = new MutationObserver(function (mutationsList) {
           mutationsList.forEach(function (mutation) {
             mutation.addedNodes.forEach(function (node) {
               if (node.nodeType !== 1) return;
@@ -492,8 +545,9 @@
         }
 
         function completeLoader(source) {
-          phase = "animating";
-          dispatchProgress(100, "animating");
+          cleanupAllObservers();
+          phase = source === "normal" || source === "noloader" ? "complete" : "animating";
+          dispatchProgress(100, phase);
           resumeGSAP();
           resumeIX2();
           cleanupLoader(source);
@@ -558,9 +612,6 @@
         }
 
         function initAssetTracking() {
-          var assets = document.querySelectorAll(
-            "img, iframe, video[src], script[src]",
-          );
           totalCount = 0;
 
           var imgs = document.querySelectorAll("img");
@@ -573,8 +624,8 @@
           );
           nonImgs.forEach(function (el) {
             totalCount++;
-            el.addEventListener("load", onAssetResolved);
-            el.addEventListener("error", onAssetResolved);
+            el.addEventListener("load", onAssetResolved, { once: true });
+            el.addEventListener("error", onAssetResolved, { once: true });
           });
 
           if (totalCount === 0) {
@@ -583,9 +634,16 @@
           }
         }
 
-        window.addEventListener("load", function () {
-          removeLoader("Window Load");
-        });
+        function handleWindowLoad() {
+          if (document.readyState === "complete") {
+            removeLoader("Window Load");
+          } else {
+            window.addEventListener("load", function () {
+              removeLoader("Window Load");
+            }, { once: true });
+          }
+        }
+        handleWindowLoad();
         setTimeout(function () {
           removeLoader("Failsafe");
         }, failsafeTime);
