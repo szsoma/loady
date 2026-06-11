@@ -10,6 +10,7 @@ function setupDOM(loaderHTML) {
 var _dclFns = [];
 var _clickFns = [];
 var _mouseoverFns = [];
+var _touchstartFns = [];
 
 function loadScript() {
   vi.resetModules();
@@ -19,12 +20,15 @@ function loadScript() {
   _clickFns = [];
   _mouseoverFns.forEach(function (fn) { document.removeEventListener('mouseover', fn); });
   _mouseoverFns = [];
+  _touchstartFns.forEach(function (fn) { document.removeEventListener('touchstart', fn); });
+  _touchstartFns = [];
 
   var origAdd = document.addEventListener;
   document.addEventListener = function (type, fn, opts) {
     if (type === 'DOMContentLoaded') _dclFns.push(fn);
     if (type === 'click') _clickFns.push(fn);
     if (type === 'mouseover') _mouseoverFns.push(fn);
+    if (type === 'touchstart') _touchstartFns.push(fn);
     return origAdd.call(document, type, fn, opts);
   };
 
@@ -39,6 +43,7 @@ function fireDOMContentLoaded() {
   document.addEventListener = function (type, fn, opts) {
     if (type === 'click') _clickFns.push(fn);
     if (type === 'mouseover') _mouseoverFns.push(fn);
+    if (type === 'touchstart') _touchstartFns.push(fn);
     return origAdd.call(document, type, fn, opts);
   };
   document.dispatchEvent(new Event('DOMContentLoaded'));
@@ -2167,6 +2172,140 @@ describe('Prefetch touch guard', function () {
 
     expect(document.querySelector('link[rel="prefetch"]')).toBeNull();
 
+    vi.useRealTimers();
+  });
+});
+
+describe('Unified prefetch handler', function () {
+  beforeEach(function () {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '', href: 'http://localhost:3000/', origin: 'http://localhost:3000' },
+    });
+    document.querySelectorAll('link[rel="prefetch"]').forEach(function (el) { el.remove(); });
+  });
+
+  afterEach(function () {
+    vi.restoreAllMocks();
+    Object.defineProperty(window, 'location', { writable: true });
+    document.querySelectorAll('link[rel="prefetch"]').forEach(function (el) { el.remove(); });
+  });
+
+  it('prefetches on mouseover via unified handler', async function () {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container" data-loady-prefetch="true"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(100);
+
+    var prefetchLink = document.querySelector('link[rel="prefetch"]');
+    expect(prefetchLink).not.toBeNull();
+    expect(prefetchLink.href).toBe('http://localhost:3000/about');
+
+    vi.useRealTimers();
+  });
+
+  it('prefetches on touchstart via unified handler', async function () {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container" data-loady-prefetch="true"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    link.dispatchEvent(new Event('touchstart', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(100);
+
+    var prefetchLink = document.querySelector('link[rel="prefetch"]');
+    expect(prefetchLink).not.toBeNull();
+    expect(prefetchLink.href).toBe('http://localhost:3000/about');
+
+    vi.useRealTimers();
+  });
+
+  it('cancels on mouseleave for mouse events', async function () {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container" data-loady-prefetch="true"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(40);
+    link.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(60);
+
+    expect(document.querySelector('link[rel="prefetch"]')).toBeNull();
+
+    vi.useRealTimers();
+  });
+
+  it('cancels on touchend for touch events', async function () {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container" data-loady-prefetch="true"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    link.dispatchEvent(new Event('touchstart', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(40);
+    link.dispatchEvent(new Event('touchend', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(60);
+
+    expect(document.querySelector('link[rel="prefetch"]')).toBeNull();
+
+    vi.useRealTimers();
+  });
+
+  it('skips prefetch on slow connections via unified handler', async function () {
+    vi.useFakeTimers();
+    Object.defineProperty(navigator, 'connection', {
+      writable: true,
+      value: { effectiveType: '2g', saveData: false },
+    });
+
+    setupDOM('<div data-loady="container" data-loady-prefetch="true"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(document.querySelector('link[rel="prefetch"]')).toBeNull();
+
+    Object.defineProperty(navigator, 'connection', { writable: true, value: undefined });
     vi.useRealTimers();
   });
 });

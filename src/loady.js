@@ -306,11 +306,9 @@
           log("Prefetched: " + url);
         }
 
-        document.addEventListener(
-          "mouseover",
-          safeWrap(function (e) {
-            var anchor = e.target.closest("a");
-            if (!anchor || !isQualifyingLink(anchor)) return;
+        function handleLinkIntent(e) {
+          var anchor = e.target.closest("a");
+          if (!anchor || !isQualifyingLink(anchor)) return;
 
           var connection = navigator.connection;
           if (connection) {
@@ -329,47 +327,19 @@
 
           prefetchTimers.set(anchor, timer);
 
-          anchor.addEventListener(
-            "mouseleave",
-            function () {
-              clearTimeout(prefetchTimers.get(anchor));
-              prefetchTimers.delete(anchor);
-            },
-            { once: true },
-          );
-        }, null));
+          var clearEvent = e.type === "touchstart" ? "touchend" : "mouseleave";
+          var onCancel = function () {
+            clearTimeout(prefetchTimers.get(anchor));
+            prefetchTimers.delete(anchor);
+          };
+          anchor.addEventListener(clearEvent, onCancel, { once: true });
+          if (e.type === "touchstart") {
+            anchor.addEventListener("touchcancel", onCancel, { once: true });
+          }
+        }
 
-        document.addEventListener(
-          "touchstart",
-          safeWrap(function (e) {
-            var anchor = e.target.closest("a");
-            if (!anchor || !isQualifyingLink(anchor)) return;
-
-            var connection = navigator.connection;
-            if (connection) {
-              if (connection.saveData) return;
-              if (
-                connection.effectiveType === "slow-2g" ||
-                connection.effectiveType === "2g"
-              )
-                return;
-            }
-
-            var timer = setTimeout(function () {
-              prefetch(anchor.href);
-              prefetchTimers.delete(anchor);
-            }, 80);
-
-            prefetchTimers.set(anchor, timer);
-
-            var onEnd = function () {
-              clearTimeout(prefetchTimers.get(anchor));
-              prefetchTimers.delete(anchor);
-            };
-            anchor.addEventListener("touchend", onEnd, { once: true });
-            anchor.addEventListener("touchcancel", onEnd, { once: true });
-          }, null),
-        );
+        document.addEventListener("mouseover", safeWrap(handleLinkIntent, null));
+        document.addEventListener("touchstart", safeWrap(handleLinkIntent, null), { passive: true });
       }
 
       var startTime = Date.now();
