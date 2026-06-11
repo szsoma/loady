@@ -600,7 +600,7 @@
         }
 
         if (domCache.counter) domCache.counter.textContent = "0%";
-        tick();
+        requestAnimationFrame(tick);
       }
 
       function onAssetResolved() {
