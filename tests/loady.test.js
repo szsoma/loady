@@ -2163,3 +2163,56 @@ describe('try/catch guards', function () {
     document.querySelector = origQS;
   });
 });
+
+describe('DOM cache optimization', function () {
+  beforeEach(function () {
+    vi.useFakeTimers();
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(function () {
+    vi.runAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('counter and bar update correctly when cached at init', async function () {
+    setupDOM('<div data-loady="container" data-loady-failsafe="5000"><div data-loady-bar></div><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var counterEl = document.querySelector('[data-loady-counter]');
+    var barEl = document.querySelector('[data-loady-bar]');
+
+    await vi.advanceTimersByTimeAsync(500);
+
+    var counterVal = parseInt(counterEl.textContent, 10);
+    var barWidth = parseInt(barEl.style.width, 10);
+
+    expect(counterVal).toBeGreaterThan(0);
+    expect(barWidth).toBe(counterVal);
+  });
+
+  it('gsap-hide elements are still revealed after loader finishes', async function () {
+    setupDOM(`
+      <div data-loady="container" data-loady-duration="0.1" data-loady-failsafe="5000">
+        <span data-loady-counter>0%</span>
+      </div>
+      <div data-gsap-hide id="cached-hidden">Hidden</div>
+    `);
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    var el = document.getElementById('cached-hidden');
+    expect(el.style.visibility).toBe('visible');
+    expect(el.style.opacity).toBe('1');
+  });
+});

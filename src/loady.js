@@ -81,19 +81,25 @@
     var loader = document.querySelector('[data-loady="container"]');
     if (!loader) return;
 
+    var domCache = {
+      loader: loader,
+      counter: loader.querySelector("[data-loady-counter]"),
+      bar: loader.querySelector("[data-loady-bar]")
+    };
+
     try {
       var cleanupRefs = {};
 
       var gen = (window._loadyGen = (window._loadyGen || 0) + 1);
 
-      var skipGSAP = loader.getAttribute("data-loady-gsap") === "false";
+      var skipGSAP = domCache.loader.getAttribute("data-loady-gsap") === "false";
       try {
         if (!skipGSAP) pauseGSAP();
       } catch (e) {}
 
-      var viewTransition = loader.getAttribute("data-loady-view-transition");
+      var viewTransition = domCache.loader.getAttribute("data-loady-view-transition");
 
-      var skipIX2 = loader.getAttribute("data-loady-ix2") === "false";
+      var skipIX2 = domCache.loader.getAttribute("data-loady-ix2") === "false";
       var forceIX2 = !!viewTransition;
       try {
         if (!skipIX2 || forceIX2) pauseIX2();
@@ -110,7 +116,7 @@
         return;
       }
 
-      var runOnce = loader.getAttribute("data-loady-once") === "true";
+      var runOnce = domCache.loader.getAttribute("data-loady-once") === "true";
       if (runOnce && sessionStorage.getItem(SEEN_KEY) === "true") {
         resumeGSAP();
         resumeIX2();
@@ -131,7 +137,7 @@
         return;
       }
 
-      var durationVal = parseFloat(loader.getAttribute("data-loady-duration"));
+      var durationVal = parseFloat(domCache.loader.getAttribute("data-loady-duration"));
       var duration = isNaN(durationVal) ? 0.5 : durationVal;
       if (duration < 0.1 && duration !== 0) duration = 0.1;
 
@@ -143,29 +149,29 @@
         return;
       }
 
-      var animType = loader.getAttribute("data-loady-anim") || "fade";
+      var animType = domCache.loader.getAttribute("data-loady-anim") || "fade";
       var failsafeVal = parseInt(
-        loader.getAttribute("data-loady-failsafe"),
+        domCache.loader.getAttribute("data-loady-failsafe"),
         10,
       );
       var failsafeTime = isNaN(failsafeVal) ? 5000 : failsafeVal;
-      var minVal = parseInt(loader.getAttribute("data-loady-min"), 10);
+      var minVal = parseInt(domCache.loader.getAttribute("data-loady-min"), 10);
       var minTime = isNaN(minVal) ? 0 : minVal;
-      var isDebug = loader.getAttribute("data-loady-debug") === "true";
-      var easing = loader.getAttribute("data-loady-easing") || "ease-in-out";
+      var isDebug = domCache.loader.getAttribute("data-loady-debug") === "true";
+      var easing = domCache.loader.getAttribute("data-loady-easing") || "ease-in-out";
 
       var thresholdVal = parseFloat(
-        loader.getAttribute("data-loady-threshold"),
+        domCache.loader.getAttribute("data-loady-threshold"),
       );
       var threshold =
         isNaN(thresholdVal) || thresholdVal <= 0 || thresholdVal > 1
           ? 1
           : thresholdVal;
 
-      var outboundAnim = loader.getAttribute("data-loady-outbound");
+      var outboundAnim = domCache.loader.getAttribute("data-loady-outbound");
       var prefetchEnabled =
-        loader.getAttribute("data-loady-prefetch") === "true";
-      var ignoreList = loader.getAttribute("data-loady-ignore");
+        domCache.loader.getAttribute("data-loady-prefetch") === "true";
+      var ignoreList = domCache.loader.getAttribute("data-loady-ignore");
 
       try {
         var vtSupported = typeof document.startViewTransition === "function";
@@ -229,18 +235,18 @@
           document.body.setAttribute("aria-busy", "true");
           document.body.setAttribute("data-loady-status", "loading");
 
-          loader.style.transition = "none";
-          loader.style.display = "flex";
-          loader.style.opacity = "";
-          loader.style.transform = "";
+          domCache.loader.style.transition = "none";
+          domCache.loader.style.display = "flex";
+          domCache.loader.style.opacity = "";
+          domCache.loader.style.transform = "";
 
-          setAnimState(loader, outboundAnim, "initial", "outbound");
+          setAnimState(domCache.loader, outboundAnim, "initial", "outbound");
 
-          void loader.offsetHeight;
+          void domCache.loader.offsetHeight;
 
-          loader.style.transition = buildTransition(duration, easing);
+          domCache.loader.style.transition = buildTransition(duration, easing);
 
-          setAnimState(loader, outboundAnim, "final", "outbound");
+          setAnimState(domCache.loader, outboundAnim, "final", "outbound");
 
           function doNavigate() {
             isNavigating = false;
@@ -264,7 +270,7 @@
             duration * 1000 + 500,
           );
 
-          loader.addEventListener(
+          domCache.loader.addEventListener(
             "transitionend",
             function () {
               if (!navigated) {
@@ -365,15 +371,15 @@
       var perfStart = performance.now();
       var isLoaded = false;
       var counterDone = false;
-      var counterEl = loader.querySelector("[data-loady-counter]");
-      var barEl = loader.querySelector("[data-loady-bar]");
+      var counterEl = domCache.counter;
+      var barEl = domCache.bar;
 
       if (vtEnabled) {
-        loader.style.setProperty("--loady-duration", duration + "s");
-        loader.style.setProperty("--loady-easing", easing);
+        domCache.loader.style.setProperty("--loady-duration", duration + "s");
+        domCache.loader.style.setProperty("--loady-easing", easing);
         if (viewTransition === "persistent") {
-          loader.style.viewTransitionName = "loady-container";
-          loader.style.contain = "layout";
+          domCache.loader.style.viewTransitionName = "loady-container";
+          domCache.loader.style.contain = "layout";
         }
       }
 
@@ -513,9 +519,9 @@
           counterDone = true;
         }
 
-        loader.style.transition = buildTransition(duration, easing);
+        domCache.loader.style.transition = buildTransition(duration, easing);
 
-        setAnimState(loader, animType, "initial", "animateOut");
+        setAnimState(domCache.loader, animType, "initial", "animateOut");
 
         setTimeout(function () {
           if (!counterDone) {
@@ -527,7 +533,7 @@
       }
 
       function cleanupLoader(source) {
-        loader.style.display = "none";
+        domCache.loader.style.display = "none";
         document.body.removeAttribute("data-loady-status");
         document.body.removeAttribute("aria-busy");
         if (observer) observer.disconnect();
