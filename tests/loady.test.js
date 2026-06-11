@@ -2216,3 +2216,67 @@ describe('DOM cache optimization', function () {
     expect(el.style.opacity).toBe('1');
   });
 });
+
+describe('Progress update throttling', function () {
+  beforeEach(function () {
+    vi.useFakeTimers();
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(function () {
+    vi.runAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('counter and bar still animate smoothly with rAF-only throttling', async function () {
+    setupDOM('<div data-loady="container" data-loady-failsafe="5000"><div data-loady-bar></div><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var counterEl = document.querySelector('[data-loady-counter]');
+    var barEl = document.querySelector('[data-loady-bar]');
+
+    await vi.advanceTimersByTimeAsync(500);
+
+    var counterVal = parseInt(counterEl.textContent, 10);
+    var barWidth = parseInt(barEl.style.width, 10);
+
+    expect(counterVal).toBeGreaterThan(0);
+    expect(barWidth).toBe(counterVal);
+  });
+
+  it('counter never decreases with rAF throttling', async function () {
+    setupDOM('<div data-loady="container" data-loady-failsafe="5000"><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var counterEl = document.querySelector('[data-loady-counter]');
+    var previousValue = 0;
+
+    for (var step = 0; step < 10; step++) {
+      await vi.advanceTimersByTimeAsync(200);
+      var currentValue = parseInt(counterEl.textContent, 10);
+      expect(currentValue).toBeGreaterThanOrEqual(previousValue);
+      previousValue = currentValue;
+    }
+  });
+
+  it('counter snaps to 100 when loader dismisses with rAF throttling', async function () {
+    setupDOM('<div data-loady="container" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    var counterEl = document.querySelector('[data-loady-counter]');
+    expect(counterEl.textContent).toBe('100%');
+  });
+});

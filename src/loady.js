@@ -564,8 +564,7 @@
       }
 
       function startProgress() {
-        var fps = 30;
-        var interval = 1000 / fps;
+        var lastDisplayVal = -1;
 
         function tick() {
           if (tickCancelled || counterDone) {
@@ -587,16 +586,17 @@
 
           var displayVal = Math.round(Math.min(displayedPercent, 100));
 
-          if (domCache.counter) domCache.counter.textContent = displayVal + "%";
-          if (domCache.bar) domCache.bar.style.width = displayVal + "%";
+          if (displayVal !== lastDisplayVal) {
+            if (domCache.counter) domCache.counter.textContent = displayVal + "%";
+            if (domCache.bar) domCache.bar.style.width = displayVal + "%";
+            lastDisplayVal = displayVal;
+          }
 
           if (phase !== "animating") {
             dispatchProgress(Math.min(percent, 85), phase);
           }
 
-          requestAnimationFrame(function () {
-            setTimeout(tick, interval);
-          });
+          requestAnimationFrame(tick);
         }
 
         if (domCache.counter) domCache.counter.textContent = "0%";
