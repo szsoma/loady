@@ -3,7 +3,14 @@
 
   var L = window.__loadyDebug
     ? console
-    : { log: function () {}, warn: function () {}, error: function () {} };
+    : {
+        log: function () {},
+        warn: function () {},
+        error: function () {},
+        groupCollapsed: function () {},
+        groupEnd: function () {},
+        table: function () {}
+      };
 
   function log(msg) {
     L.log(
@@ -77,19 +84,25 @@
     var loader = document.querySelector('[data-loady="container"]');
     if (!loader) return;
 
+    var domCache = {
+      loader: loader,
+      counter: loader.querySelector("[data-loady-counter]"),
+      bar: loader.querySelector("[data-loady-bar]")
+    };
+
     try {
       var cleanupRefs = {};
 
       var gen = (window._loadyGen = (window._loadyGen || 0) + 1);
 
-      var skipGSAP = loader.getAttribute("data-loady-gsap") === "false";
+      var skipGSAP = domCache.loader.getAttribute("data-loady-gsap") === "false";
       try {
         if (!skipGSAP) pauseGSAP();
       } catch (e) {}
 
-      var viewTransition = loader.getAttribute("data-loady-view-transition");
+      var viewTransition = domCache.loader.getAttribute("data-loady-view-transition");
 
-      var skipIX2 = loader.getAttribute("data-loady-ix2") === "false";
+      var skipIX2 = domCache.loader.getAttribute("data-loady-ix2") === "false";
       var forceIX2 = !!viewTransition;
       try {
         if (!skipIX2 || forceIX2) pauseIX2();
@@ -106,7 +119,7 @@
         return;
       }
 
-      var runOnce = loader.getAttribute("data-loady-once") === "true";
+      var runOnce = domCache.loader.getAttribute("data-loady-once") === "true";
       if (runOnce && sessionStorage.getItem(SEEN_KEY) === "true") {
         resumeGSAP();
         resumeIX2();
@@ -127,7 +140,7 @@
         return;
       }
 
-      var durationVal = parseFloat(loader.getAttribute("data-loady-duration"));
+      var durationVal = parseFloat(domCache.loader.getAttribute("data-loady-duration"));
       var duration = isNaN(durationVal) ? 0.5 : durationVal;
       if (duration < 0.1 && duration !== 0) duration = 0.1;
 
@@ -139,29 +152,28 @@
         return;
       }
 
-      var animType = loader.getAttribute("data-loady-anim") || "fade";
+      var animType = domCache.loader.getAttribute("data-loady-anim") || "fade";
       var failsafeVal = parseInt(
-        loader.getAttribute("data-loady-failsafe"),
+        domCache.loader.getAttribute("data-loady-failsafe"),
         10,
       );
       var failsafeTime = isNaN(failsafeVal) ? 5000 : failsafeVal;
-      var minVal = parseInt(loader.getAttribute("data-loady-min"), 10);
+      var minVal = parseInt(domCache.loader.getAttribute("data-loady-min"), 10);
       var minTime = isNaN(minVal) ? 0 : minVal;
-      var isDebug = loader.getAttribute("data-loady-debug") === "true";
-      var easing = loader.getAttribute("data-loady-easing") || "ease-in-out";
+      var easing = domCache.loader.getAttribute("data-loady-easing") || "ease-in-out";
 
       var thresholdVal = parseFloat(
-        loader.getAttribute("data-loady-threshold"),
+        domCache.loader.getAttribute("data-loady-threshold"),
       );
       var threshold =
         isNaN(thresholdVal) || thresholdVal <= 0 || thresholdVal > 1
           ? 1
           : thresholdVal;
 
-      var outboundAnim = loader.getAttribute("data-loady-outbound");
+      var outboundAnim = domCache.loader.getAttribute("data-loady-outbound");
       var prefetchEnabled =
-        loader.getAttribute("data-loady-prefetch") === "true";
-      var ignoreList = loader.getAttribute("data-loady-ignore");
+        domCache.loader.getAttribute("data-loady-prefetch") === "true";
+      var ignoreList = domCache.loader.getAttribute("data-loady-ignore");
 
       try {
         var vtSupported = typeof document.startViewTransition === "function";
@@ -225,18 +237,18 @@
           document.body.setAttribute("aria-busy", "true");
           document.body.setAttribute("data-loady-status", "loading");
 
-          loader.style.transition = "none";
-          loader.style.display = "flex";
-          loader.style.opacity = "";
-          loader.style.transform = "";
+          domCache.loader.style.transition = "none";
+          domCache.loader.style.display = "flex";
+          domCache.loader.removeAttribute("data-loady-state");
+          domCache.loader.style.opacity = "";
+          domCache.loader.style.transform = "";
 
-          setAnimState(loader, outboundAnim, "initial", "outbound");
+          domCache.loader.setAttribute("data-loady-state", "outbound-" + outboundAnim);
 
-          void loader.offsetHeight;
+          void domCache.loader.offsetHeight;
 
-          loader.style.transition = buildTransition(duration, easing);
-
-          setAnimState(loader, outboundAnim, "final", "outbound");
+          domCache.loader.style.transition = "";
+          domCache.loader.setAttribute("data-loady-state", "outbound-" + outboundAnim + "-final");
 
           function doNavigate() {
             isNavigating = false;
@@ -260,7 +272,7 @@
             duration * 1000 + 500,
           );
 
-          loader.addEventListener(
+          domCache.loader.addEventListener(
             "transitionend",
             function () {
               if (!navigated) {
@@ -288,14 +300,11 @@
           link.setAttribute("as", "document");
           document.head.appendChild(link);
           log("Prefetched: " + url);
-          if (isDebug) console.log(link);
         }
 
-        document.addEventListener(
-          "mouseover",
-          safeWrap(function (e) {
-            var anchor = e.target.closest("a");
-            if (!anchor || !isQualifyingLink(anchor)) return;
+        function handleLinkIntent(e) {
+          var anchor = e.target.closest("a");
+          if (!anchor || !isQualifyingLink(anchor)) return;
 
           var connection = navigator.connection;
           if (connection) {
@@ -314,63 +323,32 @@
 
           prefetchTimers.set(anchor, timer);
 
-          anchor.addEventListener(
-            "mouseleave",
-            function () {
-              clearTimeout(prefetchTimers.get(anchor));
-              prefetchTimers.delete(anchor);
-            },
-            { once: true },
-          );
-        }, null));
+          var clearEvent = e.type === "touchstart" ? "touchend" : "mouseleave";
+          var onCancel = function () {
+            clearTimeout(prefetchTimers.get(anchor));
+            prefetchTimers.delete(anchor);
+          };
+          anchor.addEventListener(clearEvent, onCancel, { once: true });
+          if (e.type === "touchstart") {
+            anchor.addEventListener("touchcancel", onCancel, { once: true });
+          }
+        }
 
-        document.addEventListener(
-          "touchstart",
-          safeWrap(function (e) {
-            var anchor = e.target.closest("a");
-            if (!anchor || !isQualifyingLink(anchor)) return;
-
-            var connection = navigator.connection;
-            if (connection) {
-              if (connection.saveData) return;
-              if (
-                connection.effectiveType === "slow-2g" ||
-                connection.effectiveType === "2g"
-              )
-                return;
-            }
-
-            var timer = setTimeout(function () {
-              prefetch(anchor.href);
-              prefetchTimers.delete(anchor);
-            }, 80);
-
-            prefetchTimers.set(anchor, timer);
-
-            var onEnd = function () {
-              clearTimeout(prefetchTimers.get(anchor));
-              prefetchTimers.delete(anchor);
-            };
-            anchor.addEventListener("touchend", onEnd, { once: true });
-            anchor.addEventListener("touchcancel", onEnd, { once: true });
-          }, null),
-        );
+        document.addEventListener("mouseover", safeWrap(handleLinkIntent, null));
+        document.addEventListener("touchstart", safeWrap(handleLinkIntent, null), { passive: true });
       }
 
       var startTime = Date.now();
       var perfStart = performance.now();
+      var isDebug = domCache.loader.getAttribute("data-loady-debug") === "true";
       var isLoaded = false;
       var counterDone = false;
-      var counterEl = loader.querySelector("[data-loady-counter]");
-      var barEl = loader.querySelector("[data-loady-bar]");
 
-      if (vtEnabled) {
-        loader.style.setProperty("--loady-duration", duration + "s");
-        loader.style.setProperty("--loady-easing", easing);
-        if (viewTransition === "persistent") {
-          loader.style.viewTransitionName = "loady-container";
-          loader.style.contain = "layout";
-        }
+      domCache.loader.style.setProperty("--loady-duration", duration + "s");
+      domCache.loader.style.setProperty("--loady-easing", easing);
+      if (vtEnabled && viewTransition === "persistent") {
+        domCache.loader.style.viewTransitionName = "loady-container";
+        domCache.loader.style.contain = "layout";
       }
 
       if (viewTransition) {
@@ -434,42 +412,16 @@
         subtree: true,
       });
 
-      function buildTransition(dur, ease) {
-        return (
-          "opacity " + dur + "s " + ease + ", transform " + dur + "s " + ease
-        );
-      }
 
-      function setAnimState(el, anim, phase, context) {
-        var isSlide = anim === "slide-up" || anim === "slide-down";
-        if (!isSlide) {
-          el.style.opacity = phase === "initial" ? "0" : "1";
-          return;
-        }
-        if (phase === "final") {
-          el.style.transform = "translateY(0)";
-          return;
-        }
-        // phase === 'initial'
-        if (context === "outbound") {
-          // Outbound: slide-down starts above, slide-up starts below
-          var dir = anim === "slide-down" ? "-100%" : "100%";
-          el.style.transform = "translateY(" + dir + ")";
-        } else {
-          // animateOut: slide-up goes up, slide-down goes down
-          var dir = anim === "slide-up" ? "-100%" : "100%";
-          el.style.transform = "translateY(" + dir + ")";
-        }
-      }
 
       function logDebug(triggerSource) {
         if (!isDebug) return;
         var timeTaken = ((performance.now() - perfStart) / 1000).toFixed(2);
-        console.groupCollapsed(
+        L.groupCollapsed(
           "%c Loady Debug",
           "background: #222; color: #bada55; padding: 4px; border-radius: 4px;",
         );
-        console.table({
+        L.table({
           "Trigger Source": triggerSource,
           "Time Taken (s)": timeTaken,
           "Animation Type": animType,
@@ -487,7 +439,7 @@
           "GSAP Paused": !skipGSAP && !!gsapTL,
           "IX2 Paused": !skipIX2 && !!ix2Engine,
         });
-        console.groupEnd();
+        L.groupEnd();
       }
 
       function removeLoader(triggerSource) {
@@ -505,13 +457,12 @@
       function animateOut() {
         phase = "animating";
         percent = 100;
-        if (!counterEl && !barEl) {
+        if (!domCache.counter && !domCache.bar) {
           counterDone = true;
         }
 
-        loader.style.transition = buildTransition(duration, easing);
-
-        setAnimState(loader, animType, "initial", "animateOut");
+        domCache.loader.style.transition = "";
+        domCache.loader.setAttribute("data-loady-state", animType);
 
         setTimeout(function () {
           if (!counterDone) {
@@ -523,7 +474,7 @@
       }
 
       function cleanupLoader(source) {
-        loader.style.display = "none";
+        domCache.loader.style.display = "none";
         document.body.removeAttribute("data-loady-status");
         document.body.removeAttribute("aria-busy");
         if (observer) observer.disconnect();
@@ -551,13 +502,12 @@
       }
 
       function renderComplete() {
-        if (counterEl) counterEl.textContent = "100%";
-        if (barEl) barEl.style.width = "100%";
+        if (domCache.counter) domCache.counter.textContent = "100%";
+        if (domCache.bar) domCache.bar.style.width = "100%";
       }
 
       function startProgress() {
-        var fps = 30;
-        var interval = 1000 / fps;
+        var lastDisplayVal = -1;
 
         function tick() {
           if (tickCancelled || counterDone) {
@@ -579,20 +529,21 @@
 
           var displayVal = Math.round(Math.min(displayedPercent, 100));
 
-          if (counterEl) counterEl.textContent = displayVal + "%";
-          if (barEl) barEl.style.width = displayVal + "%";
+          if (displayVal !== lastDisplayVal) {
+            if (domCache.counter) domCache.counter.textContent = displayVal + "%";
+            if (domCache.bar) domCache.bar.style.width = displayVal + "%";
+            lastDisplayVal = displayVal;
+          }
 
           if (phase !== "animating") {
             dispatchProgress(Math.min(percent, 85), phase);
           }
 
-          requestAnimationFrame(function () {
-            setTimeout(tick, interval);
-          });
+          requestAnimationFrame(tick);
         }
 
-        if (counterEl) counterEl.textContent = "0%";
-        tick();
+        if (domCache.counter) domCache.counter.textContent = "0%";
+        requestAnimationFrame(tick);
       }
 
       function onAssetResolved() {
