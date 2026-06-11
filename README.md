@@ -2,7 +2,7 @@
 
 FOUC-free page loader orchestrator for GSAP-powered websites.
 
-**~3.5 KB gzipped (JS + CSS), zero dependencies.**
+**~3.1 KB gzipped (JS + CSS), zero dependencies.**
 
 ## Table of Contents
 
