@@ -374,6 +374,7 @@
 
       var startTime = Date.now();
       var perfStart = performance.now();
+      var isDebug = domCache.loader.getAttribute("data-loady-debug") === "true";
       var isLoaded = false;
       var counterDone = false;
 
@@ -448,6 +449,7 @@
 
 
       function logDebug(triggerSource) {
+        if (!isDebug) return;
         var timeTaken = ((performance.now() - perfStart) / 1000).toFixed(2);
         L.groupCollapsed(
           "%c Loady Debug",
