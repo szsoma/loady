@@ -2283,6 +2283,28 @@ describe('Unified prefetch handler', function () {
     vi.useRealTimers();
   });
 
+  it('cancels on touchcancel for touch events', async function () {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container" data-loady-prefetch="true"><span data-loady-counter>0%</span></div>');
+
+    var link = document.createElement('a');
+    link.href = 'http://localhost:3000/about';
+    link.textContent = 'About';
+    document.body.appendChild(link);
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    link.dispatchEvent(new Event('touchstart', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(40);
+    link.dispatchEvent(new Event('touchcancel', { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(60);
+
+    expect(document.querySelector('link[rel="prefetch"]')).toBeNull();
+
+    vi.useRealTimers();
+  });
+
   it('skips prefetch on slow connections via unified handler', async function () {
     vi.useFakeTimers();
     Object.defineProperty(navigator, 'connection', {
