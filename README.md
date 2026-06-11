@@ -394,7 +394,7 @@ https://example.com/page?noloader=true
 
 ## Features
 
-- **Anti-FOUC CSS** — synchronous `<head>` snippet prevents the flash of unstyled content
+- **Anti-FOUC CSS** — synchronous `<head>` snippet prevents the flash of unstyled content on first load
 - **Event-driven handoff** — no coupling to GSAP internals; your code listens for `pageLoady:finished`
 - **Exit animations** — fade, slide-up, slide-down via CSS transitions
 - **Failsafe timeout** — configurable max wait so the loader can't hang indefinitely
@@ -413,9 +413,20 @@ https://example.com/page?noloader=true
 - **bfcache handling** — restores page state on back/forward navigation
 - **Duration safety** — clamps sub-0.1s durations to 0.1s; `duration=0` triggers instant hide
 - **navigating guard** — prevents double-click from triggering duplicate navigations
-- **try/catch guards** — catches initialization errors so a broken page doesn't crash silently
+- **Error boundaries** — safeWrap() helper catches errors in all event handlers (click, mouseover, touchstart)
+- **Memory-safe observers** — MutationObserver cleanup on all code paths including early returns
+- **WeakMap timer tracking** — prefetch and touch timers tracked via WeakMap for automatic garbage collection
 - **Zero dependencies** — pure vanilla JS, works with any framework or none
 - **~3.5 KB gzipped** — CSS + JS combined
+
+### Stability & Reliability
+
+Loady is built with production robustness in mind:
+
+- **No memory leaks** — MutationObserver instances are properly disconnected on all exit paths; event timers use WeakMap for automatic cleanup
+- **Race condition safe** — navigation lock (`isNavigating`) prevents duplicate navigations; window load handler checks `document.readyState` before attaching
+- **Error boundaries** — all event handlers wrapped in `safeWrap()` to prevent uncaught exceptions from breaking the loader
+- **Consistent state** — phase transitions are deterministic based on source; asset tracking uses `{ once: true }` listeners
 
 ---
 
