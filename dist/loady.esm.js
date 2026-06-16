@@ -31,6 +31,7 @@
   var observer = null;
 
   var gsapTL = null;
+  var progressDispatchInterval = 33;
 
   function pauseGSAP() {
     if (window.gsap && window.gsap.globalTimeline) {
@@ -92,6 +93,13 @@
 
     try {
       var cleanupRefs = {};
+      var hiddenElements = new Set();
+      var trackedImages = typeof WeakSet === "function" ? new WeakSet() : null;
+      var removeLoaderTimer = null;
+      var animateOutTimer = null;
+      var failsafeTimer = null;
+      var progressDispatchAt = -progressDispatchInterval;
+      var hasCleanedUp = false;
 
       var gen = (window._loadyGen = (window._loadyGen || 0) + 1);
 
@@ -158,7 +166,7 @@
         10,
       );
       var failsafeTime = isNaN(failsafeVal) ? 5000 : failsafeVal;
-      var minVal = parseInt(domCache.loader.getAttribute("data-loady-min"), 10);
+      var minVal = parseFloat(domCache.loader.getAttribute("data-loady-min"));
       var minTime = isNaN(minVal) ? 0 : minVal;
       var easing = domCache.loader.getAttribute("data-loady-easing") || "ease-in-out";
 
@@ -196,6 +204,10 @@
         }
         if (ignoreList && anchor.matches(ignoreList)) return false;
         return true;
+      }
+
+      function isCurrentGeneration() {
+        return typeof window !== "undefined" && gen === window._loadyGen;
       }
 
       if (ignoreList || outboundAnim) {
@@ -283,9 +295,9 @@
             },
             { once: true },
           );
-        }, function () {
-          isNavigating = false;
-        }));
+          }, function () {
+            isNavigating = false;
+          }));
       }
 
       if (prefetchEnabled) {
@@ -305,6 +317,7 @@
         function handleLinkIntent(e) {
           var anchor = e.target.closest("a");
           if (!anchor || !isQualifyingLink(anchor)) return;
+          if (prefetchTimers.has(anchor)) return;
 
           var connection = navigator.connection;
           if (connection) {
@@ -317,6 +330,7 @@
           }
 
           var timer = setTimeout(function () {
+            if (!isCurrentGeneration()) return;
             prefetch(anchor.href);
             prefetchTimers.delete(anchor);
           }, 80);
@@ -365,8 +379,15 @@
       var totalCount = 0;
       var tickCancelled = false;
 
-      function dispatchProgress(pct, ph) {
-        if (gen !== window._loadyGen) return;
+      function dispatchProgress(pct, ph, force) {
+        if (!isCurrentGeneration()) return;
+        var now =
+          typeof performance !== "undefined" &&
+          typeof performance.now === "function"
+            ? performance.now()
+            : Date.now();
+        if (!force && now - progressDispatchAt < progressDispatchInterval) return;
+        progressDispatchAt = now;
         window.dispatchEvent(
           new CustomEvent("pageLoady:progress", {
             detail: { percent: pct, raw: +(pct / 100).toFixed(4), phase: ph },
@@ -381,11 +402,24 @@
       initAssetTracking();
 
       function hideGsapEl(el) {
+        if (!el) return;
+        hiddenElements.add(el);
         el.style.visibility = "hidden";
         el.style.opacity = "0";
       }
 
+      function revealGsapEls() {
+        hiddenElements.forEach(function (el) {
+          if (!el || !el.style) return;
+          el.style.visibility = "visible";
+          el.style.opacity = "1";
+        });
+        hiddenElements.clear();
+      }
+
       function trackImage(img) {
+        if (trackedImages && trackedImages.has(img)) return;
+        if (trackedImages) trackedImages.add(img);
         totalCount++;
         if (img.complete) {
           onAssetResolved();
@@ -396,6 +430,7 @@
       }
 
       observer = new MutationObserver(function (mutationsList) {
+        if (!isCurrentGeneration()) return;
         mutationsList.forEach(function (mutation) {
           mutation.addedNodes.forEach(function (node) {
             if (node.nodeType !== 1) return;
@@ -411,6 +446,8 @@
         childList: true,
         subtree: true,
       });
+
+      document.querySelectorAll("[data-gsap-hide]").forEach(hideGsapEl);
 
 
 
@@ -443,18 +480,25 @@
       }
 
       function removeLoader(triggerSource) {
-        if (isLoaded) return;
+        if (!isCurrentGeneration() || isLoaded) return;
         isLoaded = true;
         logDebug(triggerSource);
 
         var elapsed = Date.now() - startTime;
         var remaining = Math.max(0, minTime - elapsed);
-        if (remaining > 0) phase = "min-wait";
+        if (remaining > 0) {
+          phase = "min-wait";
+          dispatchProgress(Math.min(percent, 85), phase, true);
+        }
 
-        setTimeout(animateOut, remaining);
+        removeLoaderTimer = setTimeout(function () {
+          removeLoaderTimer = null;
+          animateOut();
+        }, remaining);
       }
 
       function animateOut() {
+        if (!isCurrentGeneration()) return;
         phase = "animating";
         percent = 100;
         if (!domCache.counter && !domCache.bar) {
@@ -464,7 +508,9 @@
         domCache.loader.style.transition = "";
         domCache.loader.setAttribute("data-loady-state", animType);
 
-        setTimeout(function () {
+        animateOutTimer = setTimeout(function () {
+          animateOutTimer = null;
+          if (!isCurrentGeneration()) return;
           if (!counterDone) {
             counterDone = true;
             renderComplete();
@@ -474,28 +520,41 @@
       }
 
       function cleanupLoader(source) {
+        if (!isCurrentGeneration() || hasCleanedUp) return;
+        hasCleanedUp = true;
+        if (removeLoaderTimer) {
+          clearTimeout(removeLoaderTimer);
+          removeLoaderTimer = null;
+        }
+        if (animateOutTimer) {
+          clearTimeout(animateOutTimer);
+          animateOutTimer = null;
+        }
+        if (failsafeTimer) {
+          clearTimeout(failsafeTimer);
+          failsafeTimer = null;
+        }
+        if (cleanupRefs.pageshow) {
+          window.removeEventListener("pageshow", cleanupRefs.pageshow);
+        }
         domCache.loader.style.display = "none";
         document.body.removeAttribute("data-loady-status");
         document.body.removeAttribute("aria-busy");
         if (observer) observer.disconnect();
         tickCancelled = true;
-        document.querySelectorAll("[data-gsap-hide]").forEach(function (el) {
-          el.style.visibility = "visible";
-          el.style.opacity = "1";
-        });
-        if (gen === window._loadyGen) {
-          window.dispatchEvent(
-            new CustomEvent("pageLoady:finished", {
-              detail: { source: source },
-            }),
-          );
-        }
+        revealGsapEls();
+        window.dispatchEvent(
+          new CustomEvent("pageLoady:finished", {
+            detail: { source: source },
+          }),
+        );
       }
 
       function completeLoader(source) {
+        if (!isCurrentGeneration() || hasCleanedUp) return;
         cleanupAllObservers();
         phase = source === "normal" || source === "noloader" ? "complete" : "animating";
-        dispatchProgress(100, phase);
+        dispatchProgress(100, phase, true);
         resumeGSAP();
         resumeIX2();
         cleanupLoader(source);
@@ -510,7 +569,7 @@
         var lastDisplayVal = -1;
 
         function tick() {
-          if (tickCancelled || counterDone) {
+          if (!isCurrentGeneration() || tickCancelled || counterDone || hasCleanedUp) {
             renderComplete();
             return;
           }
@@ -547,6 +606,7 @@
       }
 
       function onAssetResolved() {
+        if (!isCurrentGeneration() || hasCleanedUp) return;
         loadedCount++;
         if (totalCount === 0) {
           percent = 85;
@@ -583,16 +643,17 @@
       }
 
       function handleWindowLoad() {
-        if (document.readyState === "complete") {
+        if (document.readyState === "complete" && isCurrentGeneration()) {
           removeLoader("Window Load");
         } else {
           window.addEventListener("load", function () {
-            removeLoader("Window Load");
+            if (isCurrentGeneration()) removeLoader("Window Load");
           }, { once: true });
         }
       }
       handleWindowLoad();
-      setTimeout(function () {
+      failsafeTimer = setTimeout(function () {
+        failsafeTimer = null;
         removeLoader("Failsafe");
       }, failsafeTime);
 

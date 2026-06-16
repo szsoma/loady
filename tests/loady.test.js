@@ -673,6 +673,25 @@ describe('pageLoady:progress event', () => {
     expect(afterOneLoad.percent).toBeGreaterThan(0);
   });
 
+  it('throttles progress events during loading', async () => {
+    vi.useFakeTimers();
+    setupDOM('<div data-loady="container"><img src="a.jpg"><span data-loady-counter>0%</span></div>');
+
+    var progressEvents = [];
+    window.addEventListener('pageLoady:progress', function (e) {
+      progressEvents.push(e.detail);
+    });
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(progressEvents.length).toBeLessThanOrEqual(10);
+
+    vi.useRealTimers();
+  });
+
   it('counts already-complete images as loaded', async () => {
     setupDOM('<div data-loady="container"><img src="a.jpg"><span data-loady-counter>0%</span></div>');
 
