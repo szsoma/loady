@@ -15,6 +15,12 @@ body[data-loady-status="loading"] {
   overflow: hidden;
 }
 
+/* Note: Loady also sets the `inert` attribute on every <body> child except the
+   loader container while loading, which blocks keyboard focus, pointer, and
+   scroll into page content behind the loader. This is enforced by the browser
+   (no CSS needed here). Older browsers without `inert` support degrade gracefully
+   to the scroll-lock above. */
+
 /* 3. Ensure the loader is always on top and visible initially */
 [data-loady="container"] {
   position: fixed;
