@@ -12,6 +12,7 @@
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
+    "serve": "vite",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -27,6 +28,7 @@
     "@rollup/plugin-terser": "^0.4.4",
     "jsdom": "^29.1.1",
     "rollup": "^4.9.0",
+    "vite": "^8.1.2",
     "vitest": "^4.1.8"
   }
 }
