@@ -2566,3 +2566,69 @@ describe('CSS custom property animations', function () {
     expect(loader.style.getPropertyValue('--loady-easing')).toBe('ease-out');
   });
 });
+
+describe('inert attribute on body children during loading', function () {
+  beforeEach(function () {
+    sessionStorage.clear();
+    document.body.innerHTML = '';
+    document.body.removeAttribute('data-loady-status');
+    document.body.removeAttribute('aria-busy');
+  });
+
+  afterEach(function () {
+    vi.restoreAllMocks();
+  });
+
+  it('sets inert on body children (except loader) while loading', async function () {
+    setupDOM(
+      '<div data-loady="container" data-loady-duration="0.5" data-loady-failsafe="5000"><span data-loady-counter>0%</span></div>' +
+      '<main id="content">Hello</main>' +
+      '<footer id="foot">Foot</footer>'
+    );
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    var content = document.getElementById('content');
+    var foot = document.getElementById('foot');
+    var loader = document.querySelector('[data-loady="container"]');
+
+    expect(content.hasAttribute('inert')).toBe(true);
+    expect(foot.hasAttribute('inert')).toBe(true);
+    expect(loader.hasAttribute('inert')).toBe(false);
+  });
+
+  it('removes inert from body children when loader finishes', async function () {
+    setupDOM(
+      '<div data-loady="container" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>' +
+      '<main id="content">Hello</main>'
+    );
+
+    await loadScript();
+    fireDOMContentLoaded();
+    fireLoad();
+
+    await new Promise(function (r) { return setTimeout(r, 300); });
+
+    var content = document.getElementById('content');
+    expect(content.hasAttribute('inert')).toBe(false);
+  });
+
+  it('does not set inert when ?noloader=true bypasses the loader', async function () {
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, search: '?noloader=true' },
+    });
+    setupDOM(
+      '<div data-loady="container"><span data-loady-counter>0%</span></div>' +
+      '<main id="content">Hello</main>'
+    );
+
+    await loadScript();
+    fireDOMContentLoaded();
+
+    expect(document.getElementById('content').hasAttribute('inert')).toBe(false);
+
+    Object.defineProperty(window, 'location', { writable: true });
+  });
+});

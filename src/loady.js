@@ -402,6 +402,27 @@
       document.body.setAttribute("data-loady-status", "loading");
       document.body.setAttribute("aria-busy", "true");
 
+      // Block keyboard focus, pointer, and scroll into page content behind the loader.
+      // The loader container itself is NOT inerted. No-op on browsers without inert support.
+      function applyInert() {
+        var children = document.body.children;
+        for (var i = 0; i < children.length; i++) {
+          var el = children[i];
+          if (el !== domCache.loader && !el.hasAttribute("inert")) {
+            el.setAttribute("inert", "");
+          }
+        }
+      }
+      function removeInert() {
+        var children = document.body.children;
+        for (var i = 0; i < children.length; i++) {
+          if (children[i].hasAttribute("inert")) {
+            children[i].removeAttribute("inert");
+          }
+        }
+      }
+      applyInert();
+
       startProgress();
       initAssetTracking();
 
@@ -546,6 +567,7 @@
         document.body.removeAttribute("aria-busy");
         if (observer) observer.disconnect();
         tickCancelled = true;
+        removeInert();
         revealGsapEls();
         window.dispatchEvent(
           new CustomEvent("pageLoady:finished", {
