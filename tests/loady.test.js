@@ -1182,18 +1182,20 @@ describe('pageshow / bfcache handler', () => {
     Object.defineProperty(window, 'location', { writable: true });
   });
 
-  it('hides loader and dispatches pageLoady:finished on bfcache restore', async () => {
-    setupDOM('<div data-loady="container" data-loady-outbound="fade" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+  it('hides loader and dispatches pageLoady:finished on bfcache restore while loading', async () => {
+    setupDOM('<div data-loady="container" data-loady-duration="0.5" data-loady-failsafe="5000"><span data-loady-counter>0%</span></div>');
 
     var finished = false;
-    window.addEventListener('pageLoady:finished', function () { finished = true; });
+    var finishedSource = null;
+    window.addEventListener('pageLoady:finished', function (e) {
+      finished = true;
+      finishedSource = e.detail.source;
+    });
 
     await loadScript();
     fireDOMContentLoaded();
-    fireLoad();
 
-    await new Promise(r => setTimeout(r, 300));
-
+    // Simulate bfcache restore WHILE the loader is still active (before window.load / failsafe).
     var pageshowEvent = new Event('pageshow');
     Object.defineProperty(pageshowEvent, 'persisted', { value: true });
     window.dispatchEvent(pageshowEvent);
@@ -1201,6 +1203,7 @@ describe('pageshow / bfcache handler', () => {
     var loader = document.querySelector('[data-loady="container"]');
     expect(loader.style.display).toBe('none');
     expect(finished).toBe(true);
+    expect(finishedSource).toBe('bfcache');
   });
 
   it('does nothing on non-persisted pageshow', async () => {
@@ -1996,7 +1999,7 @@ describe('pageLoady:finished has detail.source', function () {
   });
 
   it('pageLoady:finished contains detail.source=bfcache on bfcache restore', async function () {
-    setupDOM('<div data-loady="container" data-loady-duration="0.1"><span data-loady-counter>0%</span></div>');
+    setupDOM('<div data-loady="container" data-loady-duration="0.5" data-loady-failsafe="5000"><span data-loady-counter>0%</span></div>');
 
     var eventDetail = null;
     window.addEventListener('pageLoady:finished', function (e) {
@@ -2005,13 +2008,8 @@ describe('pageLoady:finished has detail.source', function () {
 
     await loadScript();
     fireDOMContentLoaded();
-    fireLoad();
 
-    await new Promise(function (r) { setTimeout(r, 300); });
-
-    // Reset the variable before bfcache event
-    eventDetail = null;
-
+    // Simulate bfcache restore WHILE the loader is still active (not yet finished via window.load).
     var pageshowEvent = new Event('pageshow');
     Object.defineProperty(pageshowEvent, 'persisted', { value: true });
     window.dispatchEvent(pageshowEvent);
