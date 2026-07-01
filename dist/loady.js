@@ -1,3 +1,4 @@
+/* Loady v1.0.0 — FOUC-free CDN page loader — https://github.com/szsoma/loady */
 (function () {
   'use strict';
 
@@ -360,6 +361,9 @@
         var isDebug = domCache.loader.getAttribute("data-loady-debug") === "true";
         var isLoaded = false;
         var counterDone = false;
+        var prefersReducedMotion =
+          window.matchMedia &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
         domCache.loader.style.setProperty("--loady-duration", duration + "s");
         domCache.loader.style.setProperty("--loady-easing", easing);
@@ -400,6 +404,27 @@
 
         document.body.setAttribute("data-loady-status", "loading");
         document.body.setAttribute("aria-busy", "true");
+
+        // Block keyboard focus, pointer, and scroll into page content behind the loader.
+        // The loader container itself is NOT inerted. No-op on browsers without inert support.
+        function applyInert() {
+          var children = document.body.children;
+          for (var i = 0; i < children.length; i++) {
+            var el = children[i];
+            if (el !== domCache.loader && !el.hasAttribute("inert")) {
+              el.setAttribute("inert", "");
+            }
+          }
+        }
+        function removeInert() {
+          var children = document.body.children;
+          for (var i = 0; i < children.length; i++) {
+            if (children[i].hasAttribute("inert")) {
+              children[i].removeAttribute("inert");
+            }
+          }
+        }
+        applyInert();
 
         startProgress();
         initAssetTracking();
@@ -545,6 +570,7 @@
           document.body.removeAttribute("aria-busy");
           if (observer) observer.disconnect();
           tickCancelled = true;
+          removeInert();
           revealGsapEls();
           window.dispatchEvent(
             new CustomEvent("pageLoady:finished", {
@@ -586,8 +612,13 @@
               if (target === 0) target = 85;
               increment = 0.5;
             }
-            var next = displayedPercent + increment;
-            displayedPercent = Math.max(displayedPercent, Math.min(next, target));
+            if (prefersReducedMotion) {
+              // Snap to target without visible interpolation. Still tracks real progress.
+              displayedPercent = Math.max(displayedPercent, target);
+            } else {
+              var next = displayedPercent + increment;
+              displayedPercent = Math.max(displayedPercent, Math.min(next, target));
+            }
 
             var displayVal = Math.round(Math.min(displayedPercent, 100));
 
