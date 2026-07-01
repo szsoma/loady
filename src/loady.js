@@ -361,6 +361,9 @@
       var isDebug = domCache.loader.getAttribute("data-loady-debug") === "true";
       var isLoaded = false;
       var counterDone = false;
+      var prefersReducedMotion =
+        window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
       domCache.loader.style.setProperty("--loady-duration", duration + "s");
       domCache.loader.style.setProperty("--loady-easing", easing);
@@ -609,8 +612,13 @@
             if (target === 0) target = 85;
             increment = 0.5;
           }
-          var next = displayedPercent + increment;
-          displayedPercent = Math.max(displayedPercent, Math.min(next, target));
+          if (prefersReducedMotion) {
+            // Snap to target without visible interpolation. Still tracks real progress.
+            displayedPercent = Math.max(displayedPercent, target);
+          } else {
+            var next = displayedPercent + increment;
+            displayedPercent = Math.max(displayedPercent, Math.min(next, target));
+          }
 
           var displayVal = Math.round(Math.min(displayedPercent, 100));
 
