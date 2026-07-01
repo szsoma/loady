@@ -230,75 +230,75 @@
 
             if (isNavigating) return;
 
-          e.preventDefault();
-          isNavigating = true;
-          var destinationUrl = anchor.href;
+            e.preventDefault();
+            isNavigating = true;
+            var destinationUrl = anchor.href;
 
-          var prefersReducedMotion =
-            window.matchMedia &&
-            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-          if (prefersReducedMotion) {
-            isNavigating = false;
-            window.location.href = destinationUrl;
-            return;
-          }
-
-          if (vtEnabled && viewTransition === "true") {
-            document.startViewTransition(function () {
+            var prefersReducedMotion =
+              window.matchMedia &&
+              window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            if (prefersReducedMotion) {
+              isNavigating = false;
               window.location.href = destinationUrl;
-            });
-            return;
-          }
+              return;
+            }
 
-          document.body.setAttribute("aria-busy", "true");
-          document.body.setAttribute("data-loady-status", "loading");
-
-          domCache.loader.style.transition = "none";
-          domCache.loader.style.display = "flex";
-          domCache.loader.removeAttribute("data-loady-state");
-          domCache.loader.style.opacity = "";
-          domCache.loader.style.transform = "";
-
-          domCache.loader.setAttribute("data-loady-state", "outbound-" + outboundAnim);
-
-          void domCache.loader.offsetHeight;
-
-          domCache.loader.style.transition = "";
-          domCache.loader.setAttribute("data-loady-state", "outbound-" + outboundAnim + "-final");
-
-          function doNavigate() {
-            isNavigating = false;
-            if (vtEnabled && viewTransition === "persistent") {
+            if (vtEnabled && viewTransition === "true") {
               document.startViewTransition(function () {
                 window.location.href = destinationUrl;
               });
-            } else {
-              window.location.href = destinationUrl;
+              return;
             }
-          }
 
-          var navigated = false;
-          var failsafe = setTimeout(
-            function () {
-              if (!navigated) {
-                navigated = true;
-                doNavigate();
-              }
-            },
-            duration * 1000 + 500,
-          );
+            document.body.setAttribute("aria-busy", "true");
+            document.body.setAttribute("data-loady-status", "loading");
 
-          domCache.loader.addEventListener(
-            "transitionend",
-            function () {
-              if (!navigated) {
-                navigated = true;
-                clearTimeout(failsafe);
-                doNavigate();
+            domCache.loader.style.transition = "none";
+            domCache.loader.style.display = "flex";
+            domCache.loader.removeAttribute("data-loady-state");
+            domCache.loader.style.opacity = "";
+            domCache.loader.style.transform = "";
+
+            domCache.loader.setAttribute("data-loady-state", "outbound-" + outboundAnim);
+
+            void domCache.loader.offsetHeight;
+
+            domCache.loader.style.transition = "";
+            domCache.loader.setAttribute("data-loady-state", "outbound-" + outboundAnim + "-final");
+
+            function doNavigate() {
+              isNavigating = false;
+              if (vtEnabled && viewTransition === "persistent") {
+                document.startViewTransition(function () {
+                  window.location.href = destinationUrl;
+                });
+              } else {
+                window.location.href = destinationUrl;
               }
-            },
-            { once: true },
-          );
+            }
+
+            var navigated = false;
+            var failsafe = setTimeout(
+              function () {
+                if (!navigated) {
+                  navigated = true;
+                  doNavigate();
+                }
+              },
+              duration * 1000 + 500,
+            );
+
+            domCache.loader.addEventListener(
+              "transitionend",
+              function () {
+                if (!navigated) {
+                  navigated = true;
+                  clearTimeout(failsafe);
+                  doNavigate();
+                }
+              },
+              { once: true },
+            );
           }, function () {
             isNavigating = false;
           }));
