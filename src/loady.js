@@ -541,6 +541,9 @@
         if (cleanupRefs.pageshow) {
           window.removeEventListener("pageshow", cleanupRefs.pageshow);
         }
+        if (cleanupRefs.load) {
+          window.removeEventListener("load", cleanupRefs.load);
+        }
         domCache.loader.style.display = "none";
         document.body.removeAttribute("data-loady-status");
         document.body.removeAttribute("aria-busy");
@@ -650,9 +653,10 @@
         if (document.readyState === "complete" && isCurrentGeneration()) {
           removeLoader("Window Load");
         } else {
-          window.addEventListener("load", function () {
+          cleanupRefs.load = function () {
             if (isCurrentGeneration()) removeLoader("Window Load");
-          }, { once: true });
+          };
+          window.addEventListener("load", cleanupRefs.load, { once: true });
         }
       }
       handleWindowLoad();
